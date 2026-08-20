@@ -1,49 +1,139 @@
 # Product Specification: PeteKM — Local Markdown Second Brain for macOS
 
 **Name:** **PeteKM**  
-**AI librarian:** **RoboPete — PeteKM’s AI librarian**  
 **Platform:** Native macOS application  
 **Primary storage:** User-owned local Markdown files  
-**Primary AI agent:** Claude Code initially; architecture should remain friendly to other filesystem-capable agents such as Codex  
+**AI posture:** The app contains **zero AI functionality**. All AI filing/organization is done by the user's own filesystem-capable agent (Claude Code initially; Codex-friendly) run in a terminal against the PeteKM folder.  
 **Document purpose:** Define what the product is, how it behaves, what data it owns, and the intended user experience. This is a product/behavior specification, **not** an implementation plan.
 
 ---
 
-## 0. Open Questions & Decisions Needed
+# 0. Open Decisions (answer inline, then fold into spec)
 
-Brief list of decisions this spec does not yet settle. Each includes a recommendation; delete items as they are decided and folded into the spec body.
+Gap-analysis 2026-08-20. Type answers under each item; once resolved, the decision gets merged into the relevant section and removed from here.
 
-1. **Sandbox / distribution posture.** The spec requires shelling out to `git`, `code`, and `claude` (§12, §15, §17), which conflicts with the App Store sandbox; the Xcode project currently has `ENABLE_USER_SELECTED_FILES = readonly`, which also blocks writing notes. **Recommendation:** distribute outside the App Store (Developer ID + notarization), disable the sandbox, keep security-scoped bookmark discipline anyway for the user-chosen folder. Decide before building folder access.
+## 0.1 Blocking — these shape the architecture
 
-A: I'm confused about this. But for the time being, let's plan on not actually submitting to the Apple App Store at all, but distributing the dmg file, etc. I Hope that answers this question, but if not I want you to make any decisions regarding this. 
+### 0.1.1 App lifecycle
 
-2. **RoboPete Inbox.** `DESIGN.md` §17 treats "Review RoboPete Inbox" as a core action; this spec never defines it. **Recommendation:** defer past v1. When built, represent it as a plain Markdown file at the PeteKM folder root (e.g. `INBOX.md`) that RoboPete appends ambiguous items to; the app command simply opens it. No database, consistent with §2.2.
+The global shortcut only works while the app is running. Unspecified:
 
-A: I don't even understand what this is referring to. Please explain to me. keep open.
+- Launch at login (on by default? a setting?)?
+- Regular Dock app, or agent-style app with no Dock icon (`LSUIElement`)?
+- What does the red close button do — hide the window or quit the app?
+- What does ⌘Q do?
 
-3. **Ask RoboPete in-app?** DESIGN lists "Ask RoboPete…" as a command; spec §16.2 routes conceptual questions through Claude Code externally. **Recommendation:** v1 = no embedded chat; the palette command opens a terminal (or Claude Code) in the PeteKM folder. Revisit only if that proves clumsy.
+**Answer:**
 
-A: NO NO NO NO NO. The only way AI interacts with any part of this app or the files is through the user's own AI coding agents, interacting with the local files on their computer. i.e. they'll open Claude Code after 'cd'-ing in the terminal to their "brain repo", the notes root, etc, etc. 
+i don't care about launch at login, but yes--the app should largely remain open in the background. command-q should ACTUALLY quit, but maybe command-w simply closes. there should be an option in settings to hide the dock icon, ideally.
 
-4. **Default global shortcut.** Undecided. **Recommendation:** default to ⌃⌥Space (rarely conflicts), fully customizable per §18.2.
+### 0.1.2 How the app actually runs RoboPete
 
-A: Command-space for me personally, but we can also leave it blank to start with? don't care, you decide.
+**Resolved 2026-08-20, folded into §13–§15:** The app has **zero AI functionality** — it never invokes, launches, monitors, or parses any AI agent. Filing happens in the user's own terminal against the PeteKM folder. The app's only role is generating the agent-facing files at onboarding. The "RoboPete" persona is removed everywhere; skills are named `/petekm-*`; librarian policy lives in `AGENTS.md` (no `ROBOPETE.md`); state file is `.petekm-state.json`.
 
-5. **`.gitignore` defaults.** Contents unspecified. **Recommendation:** ignore `.robopete-state.json`, any app cache folder, and `.DS_Store`; commit everything else including `.claude/skills/`.
+### 0.1.3 "File with RoboPete" vs "Process Daily Sticky" — one command or two?
 
-A: YOU decide.
+**Resolved 2026-08-20 — moot.** The app has no AI commands (0.1.2). Which days a skill processes is a skill-authoring detail inside `/petekm-process-today` / `/petekm-process-date`, not app behavior.
 
-6. **Git command naming.** Spec said "Git Commit & Push"; DESIGN §20 says "Git Sync". Spec now uses **Git Sync** (DESIGN is the vocabulary authority). Confirm.
+## 0.2 Missing decisions
 
-A: YOU decide. easy, slick, and clear user experience is the goal here.
+### 0.2.1 Template upgrade path
 
-7. **Sticky window features in v1.** Opacity, custom colors, always-on-top, position/size memory live only in DESIGN §7. **Recommendation:** v1 = remember size/position/cursor + always-on-top toggle; colors and opacity as fast-follow. Now cross-referenced in §8.6.
+The app ships `CLAUDE.md`, `AGENTS.md`, and the `.claude/skills/petekm-*` templates. A new app version improves them, but existing PeteKM folders hold old copies and §19.2 forbids overwriting. How do updates propagate — versioned templates with an "update agent files?" prompt, or never touched after initial creation?
 
-A: YOU decide.
+**Answer:**
 
-8. **Date heading format.** `# August 19, 2026` assumed but locale/format never fixed. **Recommendation:** hard-code English "Month D, YYYY" for the H1 (personal app; deterministic for carry-forward parsing), friendly format in UI chrome per DESIGN §28.
+### 0.2.2 Pasted images / attachments
 
-A: YOU decide.
+User pastes a screenshot into the Daily Sticky — then what? The spec is Markdown-only and defines no assets folder. Options: unsupported in v1 (paste inserts nothing / plain text only), or an `attachments/` convention with a Markdown image link.
+
+**Answer:**
+
+### 0.2.3 App update mechanism
+
+No App Store (§20.1) means no built-in update channel. Sparkle, manual download, or nothing for v1?
+
+**Answer:**
+
+### 0.2.4 Editing past Daily Stickies in-app
+
+User opens `2026-08-12.md` via **Open Date…** — editable or read-only in the app? The immutability rule targets AI only; §8.5 implies humans may edit history, but the UX intent is unstated.
+
+**Answer:**
+
+### 0.2.5 Menu-bar item: v1 or not?
+
+Spec §25 defers "menu-bar-only mode" to the future; `DESIGN.md` §6/§25/§57 spec a menu-bar glyph as if it exists. Does v1 ship a menu-bar (status) item at all?
+
+**Answer:**
+
+## 0.3 Ambiguities to pin down
+
+### 0.3.1 Search scope of root files
+
+Does **Search All PeteKM** cover `INBOX.md`, `CLAUDE.md`, `AGENTS.md`? §11.1 lists daily + Library only. `INBOX.md` probably should be searchable.
+
+**Answer:**
+
+### 0.3.2 Conflict UI minimum shape
+
+§19.4 requires a "clear conflict path" but describes no choices. Minimum viable answer needed for the plan (e.g. keep mine / keep disk / keep both as a copy).
+
+**Answer:**
+
+### 0.3.3 Git Sync — pull, or one-way?
+
+Git Sync = commit & push. If the remote is ahead, push fails — then what? If v1 never pulls, say so explicitly ("v1 backup is one-way; fix divergence in a real Git tool").
+
+**Answer:**
+
+### 0.3.4 Missing PeteKM folder at launch
+
+Folder on a disconnected drive / renamed / iCloud-evicted. What does the app show, and what's the recovery flow?
+
+**Answer:**
+
+### 0.3.5 Carry-forward with no prior sticky
+
+First day ever, or behavior set to carry-forward with an empty `daily/`. Fallback = start from scratch? Implied by §7.4, never stated.
+
+**Answer:**
+
+### 0.3.6 INDEX.md initial content
+
+Brand-new folder: empty file, or placeholder header? Adopting an existing folder: suggest the user run `/petekm-rebuild-index` in their terminal?
+
+**Answer:**
+
+## 0.4 Stale / contradictory bits to clean up
+
+### 0.4.1 DESIGN.md needs a full RoboPete sweep
+
+**Resolved 2026-08-20 — sweep done.** RoboPete persona, "Ask RoboPete", AI commands, run/progress UI, AI feedback strings, RoboPete menu, and RoboPete settings all removed from `DESIGN.md`. The pixel-art portrait survives as the **PeteKM pixel mark** — pure brand mark (app icon, About, onboarding, empty states, menu-bar glyph), never presented as a character or AI persona. Asset files keep their historical `robopete-*` filenames.
+
+### 0.4.2 `.petekm-cache/` never defined
+
+Appears in the default `.gitignore` (§6.2) but is specified nowhere. Either spec it (rebuildable cache lives at the folder root under that name) or drop the line.
+
+**Answer:**
+
+### 0.4.3 RoboPete progress bar can't have a real percentage
+
+**Resolved 2026-08-20 — moot.** No in-app agent runs (0.1.2), so no run UI, progress bar, or agent feedback exists. Covered by the 0.4.1 DESIGN.md sweep.
+
+## 0.5 Confirm these are intentional (yes/no is enough)
+
+### 0.5.1 No deletion/archival of old Daily Stickies — `daily/` stays flat forever (§5.1).
+
+**Answer:**
+
+### 0.5.2 Editor undo history is lost across app restarts.
+
+**Answer:**
+
+### 0.5.3 No export feature ever — the filesystem *is* the export (§27 rule 10).
+
+**Answer:**
 
 ---
 
@@ -64,13 +154,13 @@ The system has two conceptual layers:
 
 The Daily Stickies are the permanent historical record and must remain exactly as the user typed them.
 
-The Library may be created, updated, organized, summarized, and maintained by an AI agent called **RoboPete**.
+The Library may be created, updated, organized, summarized, and maintained by the user's own AI agent (Claude Code initially) working in the PeteKM folder.
 
 The user should not be required to name files, choose folders, create tags, maintain backlinks, or decide where information belongs while capturing it. Those are intentionally deferred decisions.
 
 The desired mental model is:
 
-> **Capture now. Organize later — mostly with RoboPete.**
+> **Capture now. Organize later — mostly with AI.**
 
 ---
 
@@ -168,7 +258,7 @@ Library files may be:
 - summarized;
 - deduplicated;
 
-by RoboPete or by the user, subject to the safety rules defined later in this spec.
+by AI agents or by the user, subject to the safety rules defined later in this spec.
 
 The Library is intended to become increasingly useful over time.
 
@@ -241,7 +331,7 @@ Examples:
 - `library/Work/JSCAPE.md`
 - `library/Personal/Home Theater.md`
 
-These files may be edited both by the user and by RoboPete.
+These files may be edited both by the user and by the agent.
 
 ## 3.4 Library file
 
@@ -249,15 +339,11 @@ An individual Markdown file inside the Library.
 
 The informal term “hard note” may be used during development, but the user-facing product should prefer **Library file** / **Library**.
 
-## 3.5 RoboPete
+## 3.5 The librarian workflow
 
-**RoboPete — PeteKM’s AI librarian.**
+There is no AI persona, mascot, or embedded assistant. "The librarian workflow" names the set of rules, instructions, and agent skills — plain files shipped in the PeteKM folder — that any filesystem-capable AI agent follows to maintain and interrogate the folder.
 
-RoboPete is not a chatbot embedded into the app.
-
-RoboPete is a named set of AI behaviors, rules, prompts, and agent skills used to maintain and interrogate the PeteKM folder.
-
-Initially, RoboPete is expected to operate primarily through Claude Code working inside the PeteKM folder.
+Initially this is expected to run through Claude Code, launched by the user in a terminal inside the PeteKM folder.
 
 The architecture should remain readable and useful to other filesystem-capable AI agents.
 
@@ -273,9 +359,9 @@ Its purpose is to help humans and AI agents quickly understand the structure and
 
 It is not the sole search mechanism and does not need to catalog every sentence or every Daily Sticky.
 
-## 3.7 RoboPete state
+## 3.7 Agent state
 
-Disposable operational state used to remember information such as the last successfully processed Daily Sticky.
+Disposable operational state (`.petekm-state.json`) used to remember information such as the last successfully processed Daily Sticky.
 
 It is not knowledge and does not replace Markdown files.
 
@@ -322,7 +408,7 @@ Maybe the Daily Sticky app should have a command palette.
 
 - Search notes
 - Open the Library in VS Code
-- File with RoboPete
+- Open a terminal for filing
 
 ## Movies
 
@@ -343,9 +429,9 @@ The user has two choices:
 
 The user opens the Library or a specific Library file in VS Code and edits it normally.
 
-### RoboPete
+### AI filing
 
-The user asks RoboPete to process recent Daily Stickies or maintain a Library file.
+The user opens a terminal in the PeteKM folder and has their agent process recent Daily Stickies or maintain a Library file (e.g. `/petekm-process-today`).
 
 Example outcome:
 
@@ -353,7 +439,7 @@ A sentence in the Daily Sticky:
 
 > Watched The Conversation. 4.5/5.
 
-may cause RoboPete to update:
+may cause the agent to update:
 
 `library/Personal/Movies Watched.md`
 
@@ -373,11 +459,10 @@ A default newly initialized PeteKM folder should resemble:
 ├── library/
 ├── .claude/
 │   └── skills/
-├── ROBOPETE.md
 ├── INDEX.md
 ├── CLAUDE.md
 ├── AGENTS.md
-├── .robopete-state.json
+├── .petekm-state.json
 └── .gitignore
 ```
 
@@ -386,6 +471,8 @@ If Git is enabled, the folder may also contain:
 ```text
 .git/
 ```
+
+Once the agent has encountered ambiguous items, the root may also contain `INBOX.md` (§13.12), created lazily by the agent rather than at setup.
 
 The app may create rebuildable application-support/cache data elsewhere or in an ignored hidden folder, but knowledge content must remain ordinary Markdown files.
 
@@ -417,17 +504,15 @@ The Library may contain folders and nested folders.
 
 The user does not need to manually create these folders during normal capture.
 
-RoboPete may propose or create useful Library organization over time.
+The agent may propose or create useful Library organization over time.
 
 The user may freely edit the structure in Finder, VS Code, terminal, or other tools.
 
-## 5.3 `ROBOPETE.md`
+## 5.3 Librarian policy lives in `AGENTS.md`
 
-Contains shared policies and identity for RoboPete.
+There is no separate policy file. `AGENTS.md` (§5.6) carries the full shared librarian policy:
 
-It should describe:
-
-- RoboPete’s role;
+- the librarian role;
 - the distinction between daily and Library files;
 - absolute prohibition on AI modification of Daily Stickies;
 - rules for creating/updating Library files;
@@ -437,7 +522,7 @@ It should describe:
 - index maintenance behavior;
 - destructive-action safeguards.
 
-RoboPete-specific Claude skills should refer to this file.
+PeteKM Claude skills should refer to `AGENTS.md` for this policy.
 
 ## 5.4 `INDEX.md`
 
@@ -481,14 +566,14 @@ Last updated: 2026-08-19
 
 Contains concise repository-wide instructions useful whenever Claude Code is launched from the PeteKM folder.
 
-It should **not** contain every detailed RoboPete procedure.
+It should **not** contain every detailed librarian procedure.
 
 Instead, it should:
 
 - explain what the repository is;
 - identify `daily/` as read-only source material for AI;
 - identify `library/` as AI-maintainable knowledge;
-- tell Claude to read `ROBOPETE.md` before modifying durable knowledge;
+- tell Claude to read the librarian policy in `AGENTS.md` before modifying durable knowledge;
 - point to relevant Claude Code project skills;
 - describe `INDEX.md`;
 - state that ordinary filesystem search should be used before loading excessive files;
@@ -498,13 +583,14 @@ The goal is for Claude Code to understand the repository immediately without mak
 
 ## 5.6 `AGENTS.md`
 
-Provides equivalent high-level orientation for coding/AI agents that recognize `AGENTS.md`.
+The primary agent-facing document. It serves two roles:
 
-It should preserve the same safety contract as `CLAUDE.md`.
+1. High-level orientation for any coding/AI agent that recognizes `AGENTS.md`.
+2. The full shared librarian policy (§5.3) — the detailed rules any agent must follow when maintaining the Library.
 
-The two files do not need to be identical, but they must not contradict each other.
+It must preserve the same safety contract as `CLAUDE.md`. The two files do not need to be identical, but they must not contradict each other; `CLAUDE.md` stays short and points here for policy.
 
-## 5.7 `.robopete-state.json`
+## 5.7 `.petekm-state.json`
 
 Stores small amounts of operational state.
 
@@ -519,7 +605,7 @@ Example:
 
 This file:
 
-- may be changed by RoboPete or the app;
+- may be changed by the agent or the app;
 - may be deleted without losing knowledge;
 - should be recreatable;
 - should never contain the canonical version of notes.
@@ -580,14 +666,23 @@ At minimum:
 - `daily/`
 - `library/`
 - `.claude/skills/`
-- `ROBOPETE.md`
 - `INDEX.md`
 - `CLAUDE.md`
 - `AGENTS.md`
-- `.robopete-state.json`
+- `.petekm-state.json`
 - `.gitignore`
 
-The application should therefore provide a usable RoboPete-ready PeteKM folder even before the user opens Claude Code.
+The default `.gitignore` contains:
+
+```gitignore
+.petekm-state.json
+.DS_Store
+.petekm-cache/
+```
+
+Everything else — including `.claude/skills/`, `CLAUDE.md`, `AGENTS.md`, and `INDEX.md` — is intended to be committed, so a clone of the repo is a fully working, agent-ready PeteKM folder.
+
+The application should therefore provide a usable agent-ready PeteKM folder even before the user opens Claude Code.
 
 ## 6.3 Git setup
 
@@ -788,7 +883,7 @@ Behavior:
 - Cursor returns to an appropriate recent position.
 - If app is already the active capture window: pressing the shortcut again may hide/dismiss it.
 
-The exact default shortcut may be chosen during implementation, but it must be customizable to avoid conflicts.
+The app ships with **no global shortcut pre-assigned**. Onboarding prompts the user to set one (suggesting ⌃⌥Space, which rarely conflicts with system or app shortcuts). The shortcut is fully customizable per §18.2; the app must warn if a chosen shortcut is known to conflict with a common system binding (e.g. ⌘Space is Spotlight).
 
 ## 8.3 Cursor behavior
 
@@ -981,8 +1076,8 @@ The command palette should eventually include at least:
 - **Open PeteKM Folder in VS Code**
 - **Open Current File in VS Code**
 - **Reveal PeteKM Folder in Finder**
-- **File with RoboPete**
-- **Process Daily Sticky**
+- **Open Terminal in PeteKM Folder** (launches Terminal.app in the folder root; no AI involved — §15)
+- **Review Inbox** (opens `INBOX.md`; shows "Nothing in Inbox." if missing/empty — §13.12)
 - **Open Library Index**
 - **Git Sync** (commit & push; when Git integration is configured)
 - **Settings**
@@ -1081,7 +1176,7 @@ The local app search should remain deterministic and fast.
 
 It does not need embeddings, an AI API, or semantic-vector infrastructure for the baseline product.
 
-AI-powered retrieval remains available through Claude Code/RoboPete.
+AI-powered retrieval remains available through the user's own agent in the terminal.
 
 ## 11.6 Search indexes are disposable
 
@@ -1139,29 +1234,19 @@ The app should treat editing via VS Code as a normal use case.
 
 ---
 
-# 13. RoboPete — PeteKM’s AI Librarian
+# 13. The Librarian Workflow
 
-## 13.1 Identity
+## 13.1 No persona
 
-**RoboPete** is the named AI librarian for the PeteKM folder.
+There is no AI persona, name, avatar, or mascot — in the app or in the repository files. "The librarian workflow" is simply the contract any AI agent follows when filing notes: read Daily Stickies, maintain the Library, never touch the source.
 
-Preferred description:
+The app itself contains **zero AI functionality** and never refers to an AI assistant in its UI. The workflow exists entirely as plain files (`AGENTS.md`, `CLAUDE.md`, `.claude/skills/petekm-*`) that the user's own agent discovers when launched in the PeteKM folder.
 
-> **RoboPete — PeteKM’s AI librarian.**
+In this spec, "the agent" means whatever filesystem-capable AI agent the user runs — Claude Code initially.
 
-Product language may use phrases such as:
+## 13.2 Core responsibility
 
-- File with RoboPete
-- Ask RoboPete
-- RoboPete processed today’s notes
-- RoboPete updated the Library
-- RoboPete rebuilt the Library Index
-
-RoboPete should feel like a competent librarian, not a decorative AI mascot.
-
-## 13.2 RoboPete’s core responsibility
-
-RoboPete turns raw daily capture into useful durable knowledge **without altering the source material**.
+The agent turns raw daily capture into useful durable knowledge **without altering the source material**.
 
 Conceptually:
 
@@ -1170,7 +1255,7 @@ DAILY STICKIES (source/ledger)
           |
           | read only
           v
-      ROBOPETE
+       AGENT
           |
           | create/update
           v
@@ -1179,9 +1264,9 @@ LIBRARY (maintained knowledge)
 
 ## 13.3 Daily Stickies are an immutable ledger
 
-RoboPete must treat `daily/` as read-only.
+The agent must treat `daily/` as read-only.
 
-RoboPete must never:
+The agent must never:
 
 - rewrite a Daily Sticky;
 - fix grammar in a Daily Sticky;
@@ -1192,11 +1277,11 @@ RoboPete must never:
 - delete Daily Stickies;
 - insert “processed” markers into Daily Stickies.
 
-If RoboPete needs processing state, it belongs in `.robopete-state.json` or other disposable state.
+If the agent needs processing state, it belongs in `.petekm-state.json` or other disposable state.
 
-## 13.4 What RoboPete should extract
+## 13.4 What the agent should extract
 
-When processing a Daily Sticky, RoboPete should look for information that has future value.
+When processing a Daily Sticky, the agent should look for information that has future value.
 
 Examples:
 
@@ -1211,7 +1296,7 @@ Examples:
 - an unresolved question that is worth preserving;
 - a recurring topic that deserves a Library file.
 
-RoboPete should not feel compelled to preserve every sentence.
+The agent should not feel compelled to preserve every sentence.
 
 ## 13.5 Examples
 
@@ -1258,15 +1343,15 @@ Source: daily/2026-08-19.md
 
 ## 13.6 Preserve uncertainty
 
-RoboPete must distinguish among:
+The agent must distinguish among:
 
 - facts explicitly captured by the user;
 - the user’s own speculation;
 - unresolved questions;
-- RoboPete’s inference;
+- the agent’s inference;
 - new external knowledge an agent may know.
 
-RoboPete should never silently convert uncertainty into certainty.
+The agent should never silently convert uncertainty into certainty.
 
 If the Daily Sticky says:
 
@@ -1278,7 +1363,7 @@ the Library file should not turn that into:
 
 ## 13.7 Provenance
 
-Library files should preserve useful provenance back to source Daily Stickies when RoboPete adds or materially updates information.
+Library files should preserve useful provenance back to source Daily Stickies when the agent adds or materially updates information.
 
 The format should remain ordinary Markdown and need not use special wikilink syntax.
 
@@ -1300,7 +1385,7 @@ The goal is easy traceability, not citation bureaucracy.
 
 ## 13.8 Prefer updating to proliferation
 
-RoboPete should search the Library before creating a new Library file.
+The agent should search the Library before creating a new Library file.
 
 If `library/Work/MFT.md` already exists, new MFT knowledge should generally be incorporated there rather than creating:
 
@@ -1312,7 +1397,7 @@ New files should be created when they provide a genuinely useful durable boundar
 
 ## 13.9 Organization is allowed to evolve
 
-RoboPete may create useful folders and move Library files when appropriate.
+The agent may create useful folders and move Library files when appropriate.
 
 However, routine daily processing should be conservative.
 
@@ -1332,40 +1417,61 @@ Important examples include:
 - Project Decisions
 - Questions to Research
 
-RoboPete should understand that some Library files are append-oriented living documents.
+The agent should understand that some Library files are append-oriented living documents.
 
 ## 13.11 Human editing wins
 
 The user may manually edit any Library file.
 
-RoboPete must treat the current on-disk version as authoritative and preserve deliberate human edits unless explicitly asked to rewrite them.
+The agent must treat the current on-disk version as authoritative and preserve deliberate human edits unless explicitly asked to rewrite them.
 
-RoboPete should not blindly regenerate entire files from scratch when a targeted edit would preserve human structure more safely.
+The agent should not blindly regenerate entire files from scratch when a targeted edit would preserve human structure more safely.
+
+## 13.12 Inbox
+
+When the agent processes Daily Stickies and cannot confidently decide where an item belongs in the Library, it must not guess. Instead it appends the item to a single plain Markdown file, **`INBOX.md`**, at the PeteKM folder root.
+
+Rules:
+
+- `INBOX.md` is **created lazily** by the agent the first time it is needed; the app does not create it during onboarding, and its absence is normal (§19.2 no-overwrite rules apply if a file with that name already exists).
+- Each appended item is a plain Markdown bullet: a copy of (or short restatement of) the ambiguous content, with provenance (§13.7) — the source Daily Sticky date — and a one-line reason it was ambiguous. Example:
+
+  ```markdown
+  - Try "Foundation" audiobook — from 2026-08-19. Unsure: Books list or Audiobooks list?
+  ```
+
+- Inbox items are **copies, not moves.** The original text stays in the Daily Sticky untouched (§2.5).
+- `INBOX.md` sits on the **mutable side** of the safety boundary, like the Library: the user may freely edit, annotate, reorder, or delete items, and the agent may also write to it.
+- The intended loop: user edits/clarifies inbox items, then runs the filing skill again; the agent treats remaining inbox items as filing input alongside unprocessed Daily Stickies, files what it now can, and **removes items from `INBOX.md` once successfully filed** (with provenance in the target Library file). Items it still can't place stay put.
+- Deleting a line from `INBOX.md` is a valid user action meaning "ignore this"; the agent must not resurrect deleted items.
+- `INBOX.md` is committed to Git like other knowledge files (not ignored).
+
+The user learns the Inbox was used from the agent's own report in the terminal (the filing skills must mention inbox counts in their final summary — §14.2). The app plays no part in that feedback. The command palette includes **Review Inbox** (§10.2), which simply opens `INBOX.md` in the editor; if the file is missing or empty, the app shows "Nothing in Inbox."
 
 ---
 
 # 14. Claude Code Skills / AI Actions
 
-RoboPete workflows should be represented as repeatable AI-agent actions rather than giant prompts pasted repeatedly.
+Librarian workflows should be represented as repeatable AI-agent actions rather than giant prompts pasted repeatedly.
 
 For Claude Code, these should be represented as **project-local Skills** stored inside the PeteKM folder:
 
 ```text
 .claude/
 └── skills/
-    ├── robopete-process-today/
+    ├── petekm-process-today/
     │   └── SKILL.md
-    ├── robopete-process-date/
+    ├── petekm-process-date/
     │   └── SKILL.md
-    ├── robopete-rebuild-index/
+    ├── petekm-rebuild-index/
     │   └── SKILL.md
-    ├── robopete-organize/
+    ├── petekm-organize/
     │   └── SKILL.md
-    └── robopete-status/
+    └── petekm-status/
         └── SKILL.md
 ```
 
-Claude Code currently discovers project skills under `.claude/skills/<skill-name>/SKILL.md`, and the directory name can provide a slash-invokable command such as `/robopete-process-today`.
+Claude Code currently discovers project skills under `.claude/skills/<skill-name>/SKILL.md`, and the directory name can provide a slash-invokable command such as `/petekm-process-today`.
 
 Each `SKILL.md` must begin with YAML frontmatter containing at least `name` and `description`; the description is what Claude uses to decide when a skill is relevant, so it should state the trigger conditions plainly.
 
@@ -1384,11 +1490,11 @@ These files live with the PeteKM folder so the workflows are:
 
 Longer procedures should live in skills and be loaded only when the procedure is invoked.
 
-`ROBOPETE.md` should contain the shared librarian behavior/policy referenced by RoboPete skills.
+`AGENTS.md` contains the shared librarian behavior/policy referenced by PeteKM skills (§5.3, §5.6).
 
-## 14.2 Initial RoboPete skills
+## 14.2 Initial PeteKM skills
 
-### `/robopete-process-today`
+### `/petekm-process-today`
 
 Primary everyday action.
 
@@ -1396,17 +1502,17 @@ Behavior:
 
 1. Determine today’s daily filename.
 2. Read the Daily Sticky.
-3. Read RoboPete policy.
+3. Read the librarian policy in `AGENTS.md`.
 4. Inspect `INDEX.md`.
 5. Search existing Library files for relevant destinations.
 6. Update or create Library files conservatively.
 7. Preserve source provenance.
 8. Do not modify the Daily Sticky.
 9. Update `INDEX.md` if the Library structure materially changed.
-10. Update RoboPete state only after successful completion.
-11. Provide a concise report of what changed.
+10. Update `.petekm-state.json` only after successful completion.
+11. Provide a concise report of what changed, including how many items went to `INBOX.md` if any.
 
-### `/robopete-process-date`
+### `/petekm-process-date`
 
 Accepts a date or daily filename and performs the same process for that source note.
 
@@ -1414,9 +1520,9 @@ Useful when:
 
 - processing was missed;
 - importing older notes;
-- re-running a day after changing RoboPete rules.
+- re-running a day after changing librarian rules.
 
-### `/robopete-rebuild-index`
+### `/petekm-rebuild-index`
 
 Inspects the Library and recreates or repairs `INDEX.md`.
 
@@ -1424,7 +1530,7 @@ It must not require reading every Daily Sticky.
 
 The Library filesystem itself is the primary source for this operation.
 
-### `/robopete-organize`
+### `/petekm-organize`
 
 Performs a more deliberate review of Library structure.
 
@@ -1439,14 +1545,14 @@ Potential behavior:
 
 Because this can produce larger structural changes, it should be explicitly invoked rather than automatically bundled into normal daily processing.
 
-### `/robopete-status`
+### `/petekm-status`
 
 Reports useful operational information such as:
 
 - last successfully processed Daily Sticky;
 - any unprocessed Daily Stickies;
 - whether `INDEX.md` appears stale;
-- notable repository state relevant to RoboPete.
+- notable repository state relevant to filing.
 
 This is informational and should not rewrite knowledge.
 
@@ -1480,40 +1586,27 @@ A PeteKM folder containing thousands of files is therefore acceptable.
 
 ---
 
-# 15. Running RoboPete from the macOS App
+# 15. Filing Happens Outside the App
 
-The app should expose RoboPete entry points, but the app itself does not need to become an AI chat client.
+**The app never invokes, launches, monitors, or parses any AI agent. Zero AI functionality.** This is a standing product boundary, not a v1 limitation.
 
-## 15.1 File with RoboPete command
+## 15.1 The filing workflow
 
-The command palette should include **File with RoboPete** or **Process Daily Sticky**.
+1. User opens a terminal in the PeteKM folder — themselves, or via the palette command **Open Terminal in PeteKM Folder** (which only launches Terminal.app at the folder root; nothing more).
+2. User launches their agent (e.g. `claude`) and invokes a skill such as `/petekm-process-today`, or just asks in natural language.
+3. The agent changes Library files, `INDEX.md`, and `INBOX.md` on disk as appropriate. The Daily Sticky remains untouched.
+4. The agent's own terminal output is the report. The app shows no progress UI, no success/failure feedback, no counts.
+5. The app notices the changed files the same way it notices any external edit (§8.5).
 
-The intended user experience is:
-
-1. User invokes command.
-2. App starts the configured AI-agent action for the PeteKM folder.
-3. RoboPete runs against the local files.
-4. User receives clear success/failure feedback.
-5. Library files and the index are changed on disk as appropriate.
-6. Daily Sticky remains untouched.
-
-Exactly how the app invokes Claude Code is an implementation decision.
-
-The product requirement is that the user should not have to copy/paste the same RoboPete prompt every day.
+Because the skills ship in the folder, the user never copy/pastes the same filing prompt — but the app plays no part in running them.
 
 ## 15.2 AI provider philosophy
 
-The product should **not require its own paid AI API** for core RoboPete behavior.
+The product has **no AI API, no AI billing, no agent configuration**. It leverages whatever user-installed/authenticated AI coding agent the user already has (Claude Code initially). Support for other agents is a matter of the repository files (`AGENTS.md`) being agent-neutral, not of app features.
 
-The intended model is to leverage a user-installed/authenticated AI coding agent such as Claude Code.
+## 15.3 Cadence is the user's business
 
-Future support for other agents may be added without changing the Markdown data model.
-
-## 15.3 Manual agent use must always work
-
-Even if in-app RoboPete execution fails, the PeteKM folder should still be fully usable by opening a terminal in the PeteKM folder and invoking the relevant AI-agent skill manually.
-
-This is an important escape hatch.
+Filing can happen once a day, once a week, or never. Nothing in the app tracks, prompts, or nags about unprocessed days; `/petekm-status` (run in the terminal) answers "what's unprocessed?" when the user cares.
 
 ---
 
@@ -1539,7 +1632,7 @@ Example:
 
 > “Where did I type ‘certificate auth’?”
 
-## 16.2 AI search / Ask RoboPete
+## 16.2 AI search (in the terminal)
 
 Use when the user wants synthesis or fuzzy conceptual retrieval.
 
@@ -1559,6 +1652,8 @@ Example:
 
 The app does not need to reproduce the second experience inside its own search UI.
 
+**Decided:** the app contains **no embedded AI chat, no "Ask RoboPete…" command, and no app-owned AI integration or API** — not just in v1, but as a standing boundary. The only way AI interacts with the PeteKM system is through the user's own AI coding agents (Claude Code, Codex, etc.) operating on the local files — typically by opening a terminal, `cd`-ing into the PeteKM folder, and invoking the agent there. (`DESIGN.md` §17's "Ask RoboPete…" command is superseded by this decision.)
+
 ---
 
 # 17. Git and Version History
@@ -1571,7 +1666,7 @@ It provides:
 - history;
 - diffing;
 - rollback;
-- visibility into RoboPete’s changes;
+- visibility into the agent’s changes;
 - portability.
 
 ## 17.1 Git should remain optional
@@ -1596,16 +1691,16 @@ PeteKM backup 2026-08-19 20:45
 
 The history is primarily for backup and recovery, not perfect semantic commit archaeology.
 
-## 17.3 RoboPete + Git
+## 17.3 AI + Git
 
 AI changes to the Library should be easy to inspect in Git.
 
 This safety model is particularly valuable because:
 
 - daily source notes remain unchanged;
-- RoboPete’s Library edits are versioned;
+- the agent’s Library edits are versioned;
 - accidental changes can be reverted;
-- the user can compare what RoboPete changed.
+- the user can compare what the agent changed.
 
 ## 17.4 Never block capture on Git
 
@@ -1628,6 +1723,8 @@ Changing the PeteKM folder should be an intentional action with clear safeguards
 ## 18.2 Global shortcut
 
 Allow configuration of the global show/hide capture shortcut.
+
+No shortcut is pre-assigned on first launch; onboarding prompts the user to choose one (suggested: ⌃⌥Space). See §8.2.
 
 ## 18.3 Daily Start Behavior
 
@@ -1660,6 +1757,8 @@ Toggle whether new daily files begin with an H1 human-readable date.
 
 Default: enabled.
 
+The H1 format is hard-coded English `Month D, YYYY` (e.g. `# August 19, 2026`) so carry-forward parsing (§7.4) stays deterministic. UI chrome (window title, date picker, etc.) may display a friendlier locale-aware format per `DESIGN.md` §28.
+
 ## 18.6 Editor preferences
 
 Potential settings:
@@ -1681,18 +1780,9 @@ The architecture should not make VS Code a hard-coded data dependency; a future 
 
 Commands should fail gracefully if VS Code is unavailable.
 
-## 18.8 AI agent
+## 18.8 No AI settings
 
-The app may expose configuration indicating which local agent is used for RoboPete.
-
-Initial target:
-
-- Claude Code
-
-Future possibilities:
-
-- Codex
-- other filesystem-capable coding agents
+The app has no AI agent configuration — it never runs one (§15). Which agent the user launches in their terminal is outside the app's knowledge.
 
 ## 18.9 Git
 
@@ -1701,7 +1791,6 @@ Potential settings:
 - Git enabled/disabled
 - auto-initialize repository
 - push remote information/status
-- whether RoboPete runs are followed by a commit
 - whether automatic backup occurs
 
 Advanced Git settings can remain outside the initial release.
@@ -1720,7 +1809,6 @@ If onboarding finds an existing:
 
 - `CLAUDE.md`
 - `AGENTS.md`
-- `ROBOPETE.md`
 - `INDEX.md`
 - `.gitignore`
 
@@ -1746,7 +1834,7 @@ A clear conflict path is required.
 
 The most important AI boundary is filesystem scope.
 
-RoboPete’s routine behavior should operate inside the selected PeteKM folder and should not need to modify arbitrary files elsewhere on the computer.
+The agent’s routine filing behavior should operate inside the selected PeteKM folder and should not need to modify arbitrary files elsewhere on the computer.
 
 ---
 
@@ -1763,6 +1851,16 @@ If the user chooses to use Claude Code, GitHub, iCloud, Dropbox, or another exte
 This separation is particularly important when a PeteKM folder may contain work-related information.
 
 The software should not imply that third-party AI or cloud use is automatically appropriate for employer-confidential data.
+
+## 20.1 Distribution and sandbox posture
+
+**Decided:** the app is **not** submitted to the Mac App Store. It is distributed directly (e.g. a notarized `.dmg`) using Developer ID signing and Apple notarization.
+
+Consequences:
+
+- The App Sandbox is **disabled**, because the product requires shelling out to `git`, `code`, and `claude` (§12, §15, §17) and read/write access to a user-chosen folder.
+- The app still keeps security-scoped-bookmark-style discipline for the user-chosen PeteKM folder: persist access via a bookmark, never assume ambient filesystem access beyond what the user granted.
+- The Xcode project's `ENABLE_USER_SELECTED_FILES = readonly` setting must be corrected as part of implementing folder access.
 
 ---
 
@@ -1917,30 +2015,30 @@ The app opens the PeteKM folder in VS Code with that note active.
 
 The user edits it normally.
 
-## Scenario E: RoboPete processes today
+## Scenario E: filing today's notes
 
-At the end of the day, the user invokes:
+At the end of the day, the user opens a terminal in the PeteKM folder (perhaps via **Open Terminal in PeteKM Folder**), launches Claude Code, and runs:
 
-**Process Daily Sticky**
+`/petekm-process-today`
 
-RoboPete reads:
+The agent reads:
 
 `daily/2026-08-19.md`
 
-He searches the Library.
+It searches the Library.
 
-He:
+It:
 
 - adds the watched movie to the existing movie log;
 - updates an existing MFT Library file with newly learned information;
 - adds an unresolved authentication question without pretending it is settled;
 - creates no unnecessary files;
 - updates `INDEX.md` only if necessary;
-- updates `.robopete-state.json`.
+- updates `.petekm-state.json`.
 
-He does **not** alter `daily/2026-08-19.md`.
+It does **not** alter `daily/2026-08-19.md`.
 
-The user receives a concise summary of Library changes.
+The agent prints a concise summary of Library changes in the terminal. The app is not involved.
 
 ## Scenario F: ask a conceptual question
 
@@ -1958,9 +2056,9 @@ The agent:
 
 It does not need to load the entire PeteKM folder into context.
 
-## Scenario G: RoboPete makes a bad change
+## Scenario G: the agent makes a bad change
 
-RoboPete edits `library/Personal/Movies Watched.md` incorrectly.
+The agent edits `library/Personal/Movies Watched.md` incorrectly.
 
 Because:
 
@@ -1992,7 +2090,7 @@ The combination should provide:
 - Git history;
 - fast local search;
 - Claude Code / AI-agent retrieval;
-- RoboPete-maintained durable knowledge.
+- agent-maintained durable knowledge.
 
 ---
 
@@ -2039,23 +2137,23 @@ These are product-level acceptance criteria, not an implementation sequence.
 - The user can open the PeteKM folder or a selected Library file in VS Code from the app.
 - The app does not need to provide a full-featured Library-file IDE.
 
-## RoboPete
+## Librarian workflow
 
-- RoboPete is represented by repository instructions and reusable agent skills.
-- Normal RoboPete processing can read Daily Stickies but cannot modify them.
-- RoboPete may create/update Library files.
-- RoboPete searches for an appropriate existing Library destination before creating unnecessary files.
-- RoboPete preserves uncertainty.
-- RoboPete adds useful source provenance.
-- RoboPete can maintain `INDEX.md`.
-- RoboPete has disposable state separate from knowledge.
-- RoboPete can be invoked manually from Claude Code even if in-app invocation is unavailable.
+- The librarian workflow is represented entirely by repository instructions and reusable agent skills; the app contains zero AI functionality and never invokes an agent.
+- Filing can read Daily Stickies but cannot modify them.
+- The agent may create/update Library files.
+- The agent searches for an appropriate existing Library destination before creating unnecessary files.
+- The agent preserves uncertainty.
+- The agent adds useful source provenance.
+- The agent can maintain `INDEX.md`.
+- The agent has disposable state (`.petekm-state.json`) separate from knowledge.
+- All filing runs in the user's own terminal via Claude Code (or another agent).
 
 ## AI agent compatibility
 
 - The PeteKM folder root contains concise `CLAUDE.md` guidance.
 - The PeteKM folder root contains `AGENTS.md` guidance for broader agent compatibility.
-- Shared librarian policy lives in `ROBOPETE.md`.
+- Shared librarian policy lives in `AGENTS.md`.
 - Claude Code project skills live under `.claude/skills/`.
 - The system does not require the entire PeteKM folder to fit into an AI context window.
 - Agent instructions encourage search-first, selective-read retrieval.
@@ -2076,13 +2174,13 @@ These ideas are compatible with the architecture but should not silently expand 
 
 Potential future additions:
 
-- automatic nightly RoboPete execution;
-- automatic Git commit/push after successful RoboPete processing;
+- scheduled/automated filing (repo-side, e.g. cron + headless agent — never app-side);
+- automatic Git commit/push after successful filing;
 - configurable external editors besides VS Code;
 - Codex-specific skills/instructions;
-- user-created RoboPete skills;
-- “process all unprocessed days” RoboPete action;
-- a read-only RoboPete activity/history panel;
+- user-created PeteKM skills;
+- “process all unprocessed days” skill;
+- a read-only filing activity/history panel (derived from Git, no agent integration);
 - local backlinks inferred from ordinary Markdown text;
 - better semantic search using a fully local index;
 - menu-bar-only mode;
@@ -2098,7 +2196,7 @@ These should be evaluated only after the core workflow proves itself.
 
 # 26. One-Sentence Product Definition
 
-> **A native macOS daily Markdown capture app that keeps your raw notes untouched, stores everything in a local folder you own, and lets RoboPete — PeteKM’s AI librarian — turn those Daily Stickies into an organized, durable second brain.**
+> **A native macOS daily Markdown capture app that keeps your raw notes untouched, stores everything in a local folder you own, and ships that folder agent-ready — so your own AI agent (Claude Code) can turn those Daily Stickies into an organized, durable second brain.**
 
 ---
 
@@ -2111,7 +2209,7 @@ If only a few rules survive every future iteration, they should be these:
 3. **Never make the user name or file something during normal capture.**
 4. **Daily Stickies are the immutable source of truth and AI may never edit them.**
 5. **Library files are ordinary Markdown files that may evolve over time.**
-6. **RoboPete does the librarian work.**
+6. **Your own AI agent does the librarian work — the app never runs AI.**
 7. **Local search handles finding text; AI handles synthesis and understanding.**
 8. **VS Code and the terminal are first-class power-user interfaces.**
 9. **Git provides history and an undo layer around AI-maintained knowledge.**

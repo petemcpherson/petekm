@@ -20,7 +20,7 @@ The custom personality comes from only a few places:
 - the **Daily Sticky** metaphor
 - custom sticky colors and opacity
 - the intentionally personal terminology
-- **RoboPete**, a 1-bit 1980s-Macintosh pixel portrait of Pete
+- the **PeteKM pixel mark**, a 1-bit 1980s-Macintosh pixel portrait of Pete — pure brand mark, not a character or AI persona
 - one restrained brand accent: **electric blue `#0A5CFF`**
 
 Everything else should feel quiet, practical, native, and fast.
@@ -31,7 +31,7 @@ Everything else should feel quiet, practical, native, and fast.
 
 A full design system now exists as a Claude Design project (**"PeteKM Design System"**, `claude.ai/design/p/f95f6b6d-9433-4e41-b93c-97064b84e609`). Part II of this document (§46 onward) is the authoritative written form of that system: exact palette, type scale, spacing, radii, elevation, motion, interaction states, iconography rules, content voice, component inventory, and brand assets.
 
-Local copies of the brand assets live in **`context/design-system/assets/`**:
+Local copies of the brand assets live in **`context/design-system/assets/`**. (The files keep their historical `robopete-*` filenames; the mark itself is now called the **PeteKM pixel mark** — the RoboPete persona was removed from the product 2026-08-20, see `spec.md` §13.1.)
 
 | File | What it is |
 | --- | --- |
@@ -44,7 +44,7 @@ Two scope notes on the design-system project itself:
 
 1. The system was derived from a written brief plus macOS convention — **it is a proposal, not documented ground truth**. Where it conflicts with `spec.md`, the spec wins.
 2. Its UI kit (`ui_kits/petekm-mac/`) mocks a **three-pane library window** (sidebar / list / reading pane / inspector). That is a design exploration for a possible Library browsing surface — it is *not* the product's primary window. The primary window remains the **Daily Sticky** (§7). Borrow the kit's metrics, chrome, and component styling; do not import its information architecture wholesale.
-3. The system's strict white/black/blue palette governs **app chrome** (toolbars, palette, settings, popovers, RoboPete UI). The **Daily Sticky canvas keeps its own user-selected background colors** (soft yellow default, §7) — that is a deliberate, spec-mandated exception layered on top of the system. Chrome drawn *over* a sticky (popovers, palette) still follows the system.
+3. The system's strict white/black/blue palette governs **app chrome** (toolbars, palette, settings, popovers). The **Daily Sticky canvas keeps its own user-selected background colors** (soft yellow default, §7) — that is a deliberate, spec-mandated exception layered on top of the system. Chrome drawn *over* a sticky (popovers, palette) still follows the system.
 
 ---
 
@@ -146,48 +146,25 @@ Examples:
 
 ---
 
-## RoboPete
+## No AI persona
 
-**RoboPete** is the AI librarian.
-
-This is the intended product terminology.
+There is **no AI name, persona, mascot, or assistant** anywhere in the app UI (`spec.md` §13.1). The app has zero AI functionality; filing happens in the user's own terminal via their own agent (Claude Code initially).
 
 Mental model:
 
 > **PeteKM is the second brain.**
 > **Daily Sticky is where I dump things.**
 > **Library is where useful knowledge lives.**
-> **RoboPete is the librarian who keeps it organized and helps me find things later.**
+> **My own agent, run in a terminal, keeps the Library organized.**
 
-RoboPete should feel playful but not intrusive.
+The only AI-adjacent surfaces the app owns:
 
-Examples:
+- **Review Inbox** — opens `INBOX.md`, a plain file the agent writes ambiguous items to
+- **Open Terminal in PeteKM Folder** — launches Terminal.app at the folder root, nothing more
 
-- Ask RoboPete
-- File with RoboPete
-- RoboPete processed today's notes
-- RoboPete updated 3 Library files
-- RoboPete needs your attention
-- Review RoboPete Inbox
-- RoboPete found 7 relevant notes
+UI copy never says "AI", "assistant", "agent is thinking", or similar. When copy must refer to agent-maintained files (onboarding, settings helper text), it says "your agent" or "agents" plainly — e.g. "Agents read Daily Stickies but never rewrite them."
 
-Prefer:
-
-> Ask RoboPete
-
-over:
-
-> AI Assistant
-
-Prefer:
-
-> File with RoboPete
-
-over:
-
-> Run AI Processing
-
-Voice note (see §54): RoboPete is always referred to in the third person — "RoboPete filed 4 things." The app never speaks as "I" or "we."
+Voice note (see §54): the app never speaks as "I" or "we", and never speaks *for* the agent.
 
 ---
 
@@ -249,7 +226,7 @@ The only intentional brand elements are:
 1. the name **PeteKM**
 2. the brand accent **electric blue `#0A5CFF`**
 3. custom Daily Sticky backgrounds
-4. **RoboPete**, the pixel mark
+4. the **PeteKM pixel mark**
 5. the pixel wordmark `PETEKM` (Silkscreen, §49) — About window and onboarding only
 
 ---
@@ -272,7 +249,7 @@ Uses:
 - command palette highlight
 - active icon buttons and quiet selection (blue tint `#EDF3FF` + blue glyph/text)
 - links
-- RoboPete himself (the mark is drawn in brand blue)
+- the pixel mark (drawn in brand blue)
 
 It must **not** dominate the interface, and it must not interfere with user-selected Daily Sticky colors.
 
@@ -282,17 +259,19 @@ It must **not** dominate the interface, and it must not interfere with user-sele
 
 macOS system typography. No shipped custom body/UI face. Exact scale, weights, and tracking in §49.
 
-Summary: SF Pro at native control sizes (28/22/17/15/13/12/11/10), weights 400/500/600 only, SF Mono for paths/counts/versions/keyboard glyphs, and **Silkscreen** (pixel display face) reserved exclusively for the `PETEKM` wordmark and RoboPete captions.
+Summary: SF Pro at native control sizes (28/22/17/15/13/12/11/10), weights 400/500/600 only, SF Mono for paths/counts/versions/keyboard glyphs, and **Silkscreen** (pixel display face) reserved exclusively for the `PETEKM` wordmark.
 
 Markdown styling should create hierarchy without making the editor feel like a word processor.
 
 ---
 
-# 6. RoboPete Visual Identity — FINAL ASSET EXISTS
+# 6. The PeteKM Pixel Mark — FINAL ASSET EXISTS
 
 ## The One Custom Asset
 
-RoboPete is now a concrete asset: **a 1-bit, 32×32 pixel portrait of founder Pete** — spiky hair, glasses, goatee — drawn in a single color, electric blue `#0A5CFF`. Master grid: `context/design-system/assets/robopete.grid.json`.
+The PeteKM pixel mark is a concrete asset: **a 1-bit, 32×32 pixel portrait of founder Pete** — spiky hair, glasses, goatee — drawn in a single color, electric blue `#0A5CFF`. Master grid: `context/design-system/assets/robopete.grid.json` (asset files keep their historical names).
+
+It is a **brand mark only** — like a woodcut logo. It is never presented as a character, assistant, or AI persona, is never given a name in the UI, never "speaks", and never appears alongside AI-flavored copy.
 
 Hard rules for the mark:
 
@@ -302,7 +281,7 @@ Hard rules for the mark:
 - **Recolor by context, not by whim:** brand blue on light surfaces; white (`--white`) on black or blue surfaces; **solid black in the menu bar** (white in dark mode), following macOS template-image convention — never blue in the menu bar.
 - Never re-draw the mark by hand; regenerate from the grid.
 
-RoboPete still must never be:
+The mark must never be:
 
 - glossy
 - 3D
@@ -312,30 +291,22 @@ RoboPete still must never be:
 - corporate mascot-ish
 - hyper-detailed
 - photorealistic
-- a slick chrome robot
 
-Avoid AI cliché visuals: sparkle icons, glowing orbs, purple-blue gradients, neural-network graphics, magic-wand metaphors.
+Avoid AI cliché visuals everywhere: sparkle icons, glowing orbs, purple-blue gradients, neural-network graphics, magic-wand metaphors.
 
 ---
 
-## RoboPete Usage
+## Mark Usage
 
-RoboPete may appear throughout the app, but sparingly.
+The mark appears sparingly, as branding only:
 
-Possible placements:
-
-- RoboPete action/results popovers
-- onboarding
-- empty states
-- RoboPete processing state
-- RoboPete Inbox
+- app icon (§37)
 - About window
-- settings section related to AI behavior
-- completion/success messages
-- app icon (now the app icon, §37)
-- menu-bar item (16 px template glyph)
+- onboarding welcome
+- empty states (optional, e.g. empty Inbox)
+- menu-bar item, if one exists (16 px template glyph)
 
-RoboPete should not constantly occupy screen space while the user is writing. The Daily Sticky should remain mostly text. RoboPete should feel like someone who appears when librarian work is happening.
+It never appears as an activity indicator, status announcer, or "someone working" — there is no in-app AI activity to indicate. The Daily Sticky remains mostly text.
 
 ---
 
@@ -627,16 +598,11 @@ Visual spec: a floating panel using `--shadow-panel` elevation over a `--surface
 - Open Library in VS Code
 - Reveal Library in Finder
 
-### RoboPete
-
-- Ask RoboPete…
-- File with RoboPete
-- Process Daily Sticky
-- Review RoboPete Inbox
-
 ### System
 
 - Search All PeteKM
+- Review Inbox
+- Open Terminal in PeteKM Folder
 - Git Sync
 - Reveal PeteKM Folder
 - Settings
@@ -647,7 +613,7 @@ The exact list can evolve.
 
 # 13. Search Design
 
-PeteKM should have normal, fast, local search in addition to AI-assisted searching through RoboPete or an external coding agent. Search should not require AI for ordinary retrieval.
+PeteKM should have normal, fast, local search. AI-assisted retrieval happens outside the app, in the user's own terminal agent. Search should not require AI for ordinary retrieval.
 
 ## Search Goals
 
@@ -659,7 +625,7 @@ Search results should include enough context to understand why a result matched:
 
 ## Search Is Not AI
 
-Local search should remain predictable and fast. RoboPete provides semantic or interpretive retrieval. Keep them conceptually separate.
+Local search should remain predictable and fast. Semantic or interpretive retrieval belongs to the user's own agent, in the terminal. Keep them conceptually separate.
 
 ---
 
@@ -691,105 +657,45 @@ Internally: **soft** = daily captured thoughts, **hard** = organized knowledge. 
 
 # 16. Immutability of Daily Stickies
 
-This is both a product rule and a design rule. Daily Sticky files represent what the user actually typed. They are historical source records. RoboPete must never rewrite, clean up, reorganize, summarize, or otherwise mutate them.
+This is both a product rule and a design rule. Daily Sticky files represent what the user actually typed. They are historical source records. AI agents must never rewrite, clean up, reorganize, summarize, or otherwise mutate them.
 
 The UI should reinforce this philosophy. Possible onboarding/settings copy:
 
-> Daily Stickies are your original record. RoboPete reads them but never rewrites them.
+> Daily Stickies are your original record. Agents read them but never rewrite them.
 
 This should feel reassuring rather than technical.
 
 ---
 
-# 17. RoboPete Experience
+# 17. Filing Happens Outside the App
 
-RoboPete should be framed as a librarian, not a chatbot bolted onto the app. The core action is turning messy captured information into organized Library knowledge. RoboPete can also help retrieve and reason over that knowledge.
+The app contains zero AI functionality (`spec.md` §15). Filing runs in the user's own terminal via their agent and the `/petekm-*` skills. The app's design consequences:
 
-## Core RoboPete Actions
+- **No AI commands** in the palette or menus. The only related conveniences are **Open Terminal in PeteKM Folder** and **Review Inbox**.
+- **No AI run UI.** No processing state, no progress bar for filing, no success/failure toasts, no counts. The agent's own terminal output is the report.
+- **The app notices agent changes as ordinary external edits** (`spec.md` §8.5) — the editor refreshes the same way it does when VS Code touches a file.
 
-### File with RoboPete
+## Inbox
 
-> Analyze relevant unprocessed Daily Sticky content and incorporate useful information into appropriate Library files.
+The agent maintains `INBOX.md` for items that are ambiguous or require human judgment: unclear destination, possible duplicate topic, unresolved question, low-confidence filings. The app's involvement is exactly one command — **Review Inbox** — which opens the file in the editor. Missing/empty file shows:
 
-### Ask RoboPete
+> Nothing in Inbox.
 
-> Ask a natural-language question about the knowledge in PeteKM.
-
-### Process Daily Sticky
-
-A more explicit/technical command for processing the current Daily Sticky.
-
-### RoboPete Inbox
-
-RoboPete may maintain an Inbox for items that are ambiguous or require human judgment: unclear destination, possible duplicate topic, unresolved question, possible new Library file, low-confidence filings.
-
-The UI should make this feel like:
-
-> RoboPete needs help deciding where this goes.
-
-Not:
-
-> AI error state.
+The Inbox should read as "items waiting for your judgment", not an AI error state.
 
 ---
 
-# 18. RoboPete Feedback and Notifications
+# 18. No AI Feedback or Notifications
 
-RoboPete status messages should be brief and human — and follow the voice rules in §54 (sentence case, no exclamation marks, no emoji, no first person, concrete monospaced numbers).
+The app never announces, summarizes, or narrates agent activity. There are no AI status messages, notifications, or result strings — deleted along with the persona. Anything the user learns about a filing run, they learn from their terminal.
 
-Good:
-
-> RoboPete filed today's notes.
-
-> RoboPete updated 3 Library files.
-
-> RoboPete found 2 items that need your attention.
-
-> RoboPete didn't find anything worth filing.
-
-> RoboPete added this to Movies.md.
-
-Avoid:
-
-> Synchronization successful.
-
-> Knowledge ingestion complete.
-
-> LLM processing finished.
-
-> Semantic indexing completed.
-
-PeteKM should sound like a small personal utility.
+(General non-AI status copy — save state, Git results — follows the voice rules in §54.)
 
 ---
 
-# 19. RoboPete Processing UI
+# 19. No AI Processing UI
 
-The app does not need elaborate AI streaming animation. A simple RoboPete appearance plus concise progress text is enough.
-
-Possible states:
-
-### Idle
-
-No RoboPete UI visible.
-
-### Working
-
-Small RoboPete visual (32 or 64 px, pixelated) and text:
-
-> RoboPete is filing your notes…
-
-Long operations use a **determinate 4 px progress bar with a real percentage** (§55 ProgressBar) — no indeterminate spinner where a real number is available.
-
-### Success
-
-> RoboPete updated 4 files.
-
-### Needs Review
-
-> RoboPete needs your help with 2 items.
-
-No giant conversational UI is required for basic filing operations.
+Removed. The app runs no AI, so no idle/working/success states exist for it. The determinate ProgressBar (§55) remains for the app's own long operations only — search indexing, folder import.
 
 ---
 
@@ -845,13 +751,6 @@ Likely sections:
 - VS Code integration
 - search behavior
 
-## RoboPete
-
-- preferred agent
-- processing settings
-- RoboPete Inbox behavior
-- automation preferences
-
 ## Git
 
 - Git integration settings
@@ -872,7 +771,7 @@ Onboarding should be extremely short. This is not a consumer SaaS onboarding fun
 
 ### Welcome
 
-Small introduction with RoboPete (the 128 px mark) and the `PETEKM` pixel wordmark — one of only two sanctioned wordmark placements.
+Small introduction with the PeteKM pixel mark (128 px) and the `PETEKM` pixel wordmark — one of only two sanctioned wordmark placements.
 
 Example:
 
@@ -961,7 +860,6 @@ Possible high-level menus:
 - View
 - Daily Sticky
 - Library
-- RoboPete
 - Window
 - Help
 
@@ -969,7 +867,7 @@ Principle:
 
 > If an action fits naturally into normal macOS menus, use them.
 
-If a menu-bar (status) item exists, its glyph is the 16 px RoboPete rendered as a template image — solid black, white in dark mode, never blue (§57).
+If a menu-bar (status) item exists, its glyph is the 16 px pixel mark rendered as a template image — solid black, white in dark mode, never blue (§57).
 
 ---
 
@@ -1050,7 +948,7 @@ Open the Library file in VS Code or PeteKM depending on final product behavior.
 
 # 31. Empty States
 
-Empty states should be minimal and may use RoboPete. Written in second person, with the next step (§54).
+Empty states should be minimal and may use the pixel mark. Written in second person, with the next step (§54).
 
 ### Empty Daily Sticky
 
@@ -1060,17 +958,13 @@ Just show the cursor. No motivational copy.
 
 > Nothing found.
 
-Optionally:
+### Empty Inbox
 
-> Ask RoboPete instead.
+Optionally the pixel mark (64 px, pixelated).
 
-### Empty RoboPete Inbox
+> Nothing in Inbox.
 
-Small RoboPete illustration (64 px, pixelated).
-
-> Nothing for RoboPete to bother you about.
-
-The tone can be lightly playful — but no exclamation marks, no emoji, no "You're all set!".
+The tone stays plain — no exclamation marks, no emoji, no "You're all set!".
 
 ---
 
@@ -1083,8 +977,6 @@ Good:
 > PeteKM couldn't open VS Code.
 
 > Git push failed.
-
-> RoboPete couldn't finish filing this note.
 
 > That folder isn't writable.
 
@@ -1114,7 +1006,7 @@ Avoid: constant motion, bouncing mascot, pulsing AI effects, confetti, elaborate
 
 # 34. Sound
 
-No custom sound design. The app should not make routine sounds during capture. RoboPete should not beep or talk by default. If sound is ever added, it should be optional and restrained.
+No custom sound design. The app should not make routine sounds during capture. If sound is ever added, it should be optional and restrained.
 
 ---
 
@@ -1146,13 +1038,13 @@ Transparency must never make text unreadable. Every icon-only control has a labe
 
 # 37. App Icon — DONE
 
-The app icon is RoboPete: the blue pixel mark centered on a **white rounded square** on the Apple icon grid (824/1024 square, ~186 px corner radius at 1024), no shadow, no gradient, no background texture.
+The app icon is the PeteKM pixel mark: the blue mark centered on a **white rounded square** on the Apple icon grid (824/1024 square, ~186 px corner radius at 1024), no shadow, no gradient, no background texture.
 
 - Master: `context/design-system/assets/robopete-appicon-1024.png`
 - Installed: `PeteKM/Assets.xcassets/AppIcon.appiconset/` (all mac slots 16 → 512@2x, generated from the master)
 - Regeneration: render the grid at integer scale onto the white rounded square; downscale from the 1024 master for small slots.
 
-The earlier sticky-note icon concepts are retired. RoboPete provides the visual identity by himself.
+The earlier sticky-note icon concepts are retired. The pixel mark provides the visual identity by itself.
 
 ---
 
@@ -1168,9 +1060,9 @@ Possible content:
 >
 > Capture in your Daily Sticky.
 > Keep the useful stuff in your Library.
-> Let RoboPete sort it out.
+> Let your agent sort it out.
 
-Include the RoboPete pixel art (128 px). Version string in SF Mono. Keep it small and charming.
+Include the pixel mark (128 px). Version string in SF Mono. Keep it small and charming.
 
 ---
 
@@ -1189,11 +1081,9 @@ Tone:
 - not motivational
 - not productivity-guru-ish
 
-The full, enforceable voice rules are §54. Highlights: sentence case everywhere; "you" for the reader, "PeteKM"/"RoboPete" in third person, never "I"/"we"; verbs for actions, nouns for places; no emoji ever; no exclamation marks; concrete monospaced numbers; mechanism over magic.
+The full, enforceable voice rules are §54. Highlights: sentence case everywhere; "you" for the reader, "PeteKM" in third person, never "I"/"we"; verbs for actions, nouns for places; no emoji ever; no exclamation marks; concrete monospaced numbers; mechanism over magic.
 
 Good:
-
-> RoboPete filed 4 things.
 
 > Nothing found.
 
@@ -1236,16 +1126,11 @@ Absolutely not.
 - Open Library in VS Code
 - Reveal in Finder
 
-## RoboPete
+## Inbox / agent surfaces
 
-- Ask RoboPete…
-- File with RoboPete
-- Process Daily Sticky
-- Review RoboPete Inbox
-- RoboPete is filing your notes…
-- RoboPete updated 3 files.
-- RoboPete needs your help with 2 items.
-- RoboPete didn't find anything worth filing.
+- Review Inbox
+- Nothing in Inbox.
+- Open Terminal in PeteKM Folder
 
 ## System
 
@@ -1254,7 +1139,7 @@ Absolutely not.
 - Open PeteKM Folder
 - Search All PeteKM
 
-(Menu items and buttons render these in sentence case per §54; the proper nouns Daily Sticky, Library, RoboPete, PeteKM, VS Code, Finder, Git keep their capitals.)
+(Menu items and buttons render these in sentence case per §54; the proper nouns Daily Sticky, Library, Inbox, PeteKM, VS Code, Finder, Git, Terminal keep their capitals.)
 
 ---
 
@@ -1298,11 +1183,7 @@ The user presses the shortcut again. The sticky disappears.
 
 Hours later, the user opens it again. Same file. Same place.
 
-Later: Command Palette → **File with RoboPete**. Tiny pixel RoboPete appears.
-
-> RoboPete updated 3 Library files.
-
-Done.
+Later: Command Palette → **Open Terminal in PeteKM Folder**. Terminal opens at the folder root; the user runs `claude` and `/petekm-process-today`. The agent reports what it filed, right there in the terminal. The app stays out of it.
 
 If the user wants to inspect or manually edit the organized knowledge: Command Palette → **Open Library in VS Code**. VS Code opens the real Markdown filesystem.
 
@@ -1326,7 +1207,7 @@ Capture friction should approach zero.
 
 Third question:
 
-> **Can RoboPete handle this later instead of making the user organize it now?**
+> **Can the agent handle this later instead of making the user organize it now?**
 
 If yes, prefer that.
 
@@ -1339,11 +1220,11 @@ If yes, prefer that.
 | Product | **PeteKM** |
 | Primary capture surface | **Daily Sticky** |
 | Organized knowledge | **Library** |
-| AI librarian | **RoboPete** |
+| AI | None in-app; user's own terminal agent |
 | Visual identity | Mostly native macOS; white/black/one-blue chrome |
 | Brand accent | **Electric blue `#0A5CFF`** (dark mode `#2E72FF`) |
 | Daily Sticky default | Soft yellow, translucent (exact values TBD) |
-| Custom asset | 1-bit 32×32 pixel **RoboPete**, single-color |
+| Custom asset | 1-bit 32×32 **PeteKM pixel mark**, single-color |
 | Wordmark | `PETEKM` in Silkscreen — About + onboarding only |
 | Typography | macOS system fonts (SF Pro / SF Mono) |
 | Core brand philosophy | Almost no branding |
@@ -1364,7 +1245,6 @@ The real design work is in:
 - preserving spatial familiarity
 - making Markdown pleasant
 - making search fast
-- giving RoboPete just enough personality
 - letting macOS handle everything macOS already handles well
 
 The ideal reaction is not:
@@ -1375,9 +1255,9 @@ It is:
 
 > "Oh. This is exactly where I dump stuff."
 
-And five minutes later:
+And after an evening terminal run:
 
-> "Holy shit, RoboPete already filed that."
+> "Holy shit, it's all filed."
 
 ---
 ---
@@ -1390,7 +1270,7 @@ Authoritative token values and rules, transcribed from the "PeteKM Design System
 
 # 46. System Overview
 
-Three colors do everything: **white `#FFFFFF`**, **black `#000000`**, **electric blue `#0A5CFF`**. Greys are pure neutral — no warm or cool tint — and exist only for chrome, hairlines, and secondary text. One illustration exists in the entire brand: RoboPete. There are **no images, no photography, no patterns, no textures, no gradients — anywhere**. If a surface needs to recede, it gets 2% darker, not a gradient. If a design feels like it needs a photo or illustration, it needs less content instead.
+Three colors do everything: **white `#FFFFFF`**, **black `#000000`**, **electric blue `#0A5CFF`**. Greys are pure neutral — no warm or cool tint — and exist only for chrome, hairlines, and secondary text. One illustration exists in the entire brand: the PeteKM pixel mark. There are **no images, no photography, no patterns, no textures, no gradients — anywhere**. If a surface needs to recede, it gets 2% darker, not a gradient. If a design feels like it needs a photo or illustration, it needs less content instead.
 
 ---
 
@@ -1478,7 +1358,7 @@ Families:
 
 - `--font-system`: `-apple-system` → SF Pro (SwiftUI: `.system`)
 - `--font-mono`: SF Mono / Menlo (SwiftUI: `.system(design: .monospaced)`)
-- `--font-pixel`: **Silkscreen** (Google Fonts) — the pixel display face. Used *only* for the `PETEKM` wordmark and RoboPete captions. Never in UI chrome, never body copy. (Flagged substitution: if a licensed 80s-Mac bitmap face is preferred later, it replaces Silkscreen 1:1.)
+- `--font-pixel`: **Silkscreen** (Google Fonts) — the pixel display face. Used *only* for the `PETEKM` wordmark. Never in UI chrome, never body copy. (Flagged substitution: if a licensed 80s-Mac bitmap face is preferred later, it replaces Silkscreen 1:1.)
 
 Scale (px):
 
@@ -1568,11 +1448,11 @@ Nothing bounces, springs, rotates, or scales. Determinate progress bars (4 px, r
 
 The voice is **a competent friend explaining a tool they built**. Plain, short, specific. It never sells and never gushes.
 
-1. **Sentence case everywhere.** Buttons, menu items, headings, labels: "Quick capture", "Rebuild index", "Where should notes live?" ALL CAPS only for micro-labels and the pixel wordmark. (Product proper nouns — Daily Sticky, Library, RoboPete, PeteKM — keep their capitals.)
-2. **"You" for the reader; the app and RoboPete in third person.** Never "we", never "I". ✅ "RoboPete put this in Movies.md." ❌ "I filed this for you." ❌ "We've organized your notes."
+1. **Sentence case everywhere.** Buttons, menu items, headings, labels: "Quick capture", "Rebuild index", "Where should notes live?" ALL CAPS only for micro-labels and the pixel wordmark. (Product proper nouns — Daily Sticky, Library, Inbox, PeteKM — keep their capitals.)
+2. **"You" for the reader; the app in third person.** Never "we", never "I", and the app never speaks for the agent. ✅ "PeteKM stores notes as plain files." ❌ "I filed this for you." ❌ "We've organized your notes."
 3. **State the mechanism, not the magic.** ✅ "Watches copied text while PeteKM runs." ❌ "Intelligently captures everything, everywhere."
 4. **Verbs for actions, nouns for places.** Buttons are verbs (Capture, Open note, Rebuild index); sidebar and tabs are nouns (Inbox, Library, Everything).
-5. **No emoji. Ever.** The only pictorial element in the brand is RoboPete.
+5. **No emoji. Ever.** The only pictorial element in the brand is the pixel mark.
 6. **No exclamation marks.** No "Oops!", "Nice!", "You're all set!". A finished state reads "Inbox clear."
 7. **Privacy stated flatly, never boasted.** ✅ "Nothing is uploaded, now or later." ❌ "Your privacy is our top priority!"
 8. **Numbers concrete and monospaced.** `1,284 notes`, `4.2 MB`. Never "lots of notes" or "blazing fast".
@@ -1582,9 +1462,8 @@ The voice is **a competent friend explaining a tool they built**. Plain, short, 
 
 Example strings in-voice:
 
-> Type anything. PeteKM files it for you.
-> Plain Markdown files. PeteKM never moves them without telling you.
-> Turn off to leave everything in the Inbox.
+> Type anything. File it later.
+> Plain Markdown files. PeteKM never moves them.
 > Index up to date · 1,284 notes
 > Your notes never leave this Mac
 
@@ -1602,7 +1481,7 @@ Example strings in-voice:
 - **Badge** — tiny uppercase pill for counts/states. Tones: neutral, accent, quiet, success, warning, error — semantic tones outlined, not filled.
 - **Tag** — knowledge tag chip with drawn `#` prefix; selectable; removal affordance in editors.
 - **Card** — hairline container (§48). Never a shadow. Optional title + mono meta line; `interactive` adds hover tint.
-- **RoboPete** — the mark as a component so it is never re-drawn by hand. Sizes = multiples of 32; single color prop.
+- **PixelMark** — the PeteKM pixel mark as a component so it is never re-drawn by hand. Sizes = multiples of 32; single color prop.
 
 ## Forms
 
@@ -1620,8 +1499,8 @@ Example strings in-voice:
 
 ## Feedback
 
-- **EmptyState** — title + one-sentence description + optional single action; optionally the RoboPete mark.
-- **ProgressBar** — 4 px determinate bar with label + real percentage. Indexing/import/RoboPete progress.
+- **EmptyState** — title + one-sentence description + optional single action; optionally the pixel mark.
+- **ProgressBar** — 4 px determinate bar with label + real percentage. Indexing/import progress (the app's own operations only — no AI runs exist).
 - **KeyHint** — shortcut chips: mono glyphs `⌘ ⇧ ⌥ ⌃ ↩ ⌫` in tiny hairline-bordered keys. Appears beside actions, in menus, in the command palette.
 
 Deliberately **not** in the system: Dialog, Tooltip, Toast, Avatar, Tabs — nothing in the product calls for custom versions; use native macOS sheets/alerts/tooltips, and SegmentedControl where a web app would use tabs.
@@ -1634,15 +1513,15 @@ Deliberately **not** in the system: Dialog, Tooltip, Toast, Avatar, Tabs — not
 - Icons are **monochrome and stroked** — never filled, never two-tone, never colored except when inheriting selected/active blue.
 - Icons never appear without a purpose: no decorative icons in headings, cards, or empty states.
 - **Emoji are never used.** Unicode is used only for keyboard glyphs and the `·` separator in metadata lines ("Index up to date · 1,284 notes").
-- The one raster "icon" is RoboPete, always rendered pixelated.
+- The one raster "icon" is the pixel mark, always rendered pixelated.
 
 ---
 
 # 57. Brand Marks
 
-## RoboPete mark
+## PeteKM pixel mark
 
-See §6 for rules. Renders: 32 / 64 / 128 / 512 px from `robopete.grid.json`. On white/light: brand blue. On black or blue: white. Menu bar: template image (black; system inverts in dark mode), 16 px.
+See §6 for rules. Renders: 32 / 64 / 128 / 512 px from `robopete.grid.json` (historical filename). On white/light: brand blue. On black or blue: white. Menu bar: template image (black; system inverts in dark mode), 16 px.
 
 ## Wordmark
 
@@ -1657,7 +1536,7 @@ See §6 for rules. Renders: 32 / 64 / 128 / 512 px from `robopete.grid.json`. On
 # 58. Applying the System in SwiftUI (practical mapping)
 
 - Mirror tokens as a `DS` namespace (Color/Font/Spacing/Radius/Duration constants) generated once from §47–§52. Support light/dark via asset-catalog colors carrying the §47 dark overrides.
-- Prefer native controls (`.buttonStyle(.borderedProminent)` tinted `#0A5CFF`, native `Toggle`, `Picker`, `TextField`) before custom styling; reach for custom drawing only where the system prescribes something AppKit doesn't do (hairline three-pane structure, KeyHint chips, RoboPete rendering, command palette).
-- RoboPete: load the PNGs (or render the grid) with `.interpolation(.none)` and `.antialiased(false)`.
+- Prefer native controls (`.buttonStyle(.borderedProminent)` tinted `#0A5CFF`, native `Toggle`, `Picker`, `TextField`) before custom styling; reach for custom drawing only where the system prescribes something AppKit doesn't do (hairline three-pane structure, KeyHint chips, pixel-mark rendering, command palette).
+- Pixel mark: load the PNGs (or render the grid) with `.interpolation(.none)` and `.antialiased(false)`.
 - The strict palette applies to chrome. The Daily Sticky canvas color/opacity remains a user setting (§7) and is the only surface allowed outside white/black/blue.
 - When the design system and `spec.md` disagree, the spec wins; when this document and the live Claude Design project disagree, update whichever is stale — they are meant to stay in sync.
