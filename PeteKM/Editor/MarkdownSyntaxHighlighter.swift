@@ -4,6 +4,8 @@ import AppKit
 struct MarkdownStyle: Equatable {
     var fontSize: CGFloat = 13
     var lineSpacing: CGFloat = 4
+    /// Font family name for the editor, or `nil` for the system font (§18.6).
+    var fontName: String?
 
     static let `default` = MarkdownStyle()
 
@@ -20,8 +22,21 @@ struct MarkdownStyle: Equatable {
     /// Visual width of one list nesting level.
     var listIndent: CGFloat { fontSize * 1.6 }
 
-    var body: NSFont { .systemFont(ofSize: fontSize) }
+    var body: NSFont { font(size: fontSize, weight: .regular) }
     var mono: NSFont { .monospacedSystemFont(ofSize: fontSize - 1, weight: .regular) }
+
+    /// Heading font at `level` — same family as the body text, heavier.
+    func heading(_ level: Int) -> NSFont { font(size: headingSize(level), weight: .semibold) }
+
+    /// Falls back to the system font when the chosen family is missing, so an
+    /// uninstalled font can never leave the editor unreadable.
+    private func font(size: CGFloat, weight: NSFont.Weight) -> NSFont {
+        let system = NSFont.systemFont(ofSize: size, weight: weight)
+        guard let fontName, !fontName.isEmpty else { return system }
+        guard let base = NSFont(name: fontName, size: size) else { return system }
+        guard weight >= .semibold else { return base }
+        return NSFontManager.shared.convert(base, toHaveTrait: .boldFontMask)
+    }
 }
 
 /// Applies live styling *on top of* still-visible Markdown syntax (§9.1–9.2).
@@ -79,8 +94,7 @@ enum MarkdownSyntaxHighlighter {
 
         if let match = heading.firstMatch(in: line, range: lineOnly) {
             let level = match.range(at: 1).length
-            let font = NSFont.systemFont(ofSize: style.headingSize(level), weight: .semibold)
-            storage.addAttribute(.font, value: font, range: lineRange)
+            storage.addAttribute(.font, value: style.heading(level), range: lineRange)
             dim(storage, shift(match.range(at: 1), by: lineRange.location))
             return
         }

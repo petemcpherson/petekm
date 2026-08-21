@@ -13,6 +13,10 @@ struct PeteKMApp: App {
         }
         .commands {
             CommandGroup(replacing: .newItem) { }
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") { UpdateController.shared.checkForUpdates() }
+                    .disabled(!UpdateController.shared.canCheckForUpdates)
+            }
         }
     }
 }

@@ -1,11 +1,39 @@
+//
+//  SettingsView.swift
+//  PeteKM
+//
+//  A normal macOS Settings window, not a custom dashboard (DESIGN §21).
+//  Sections follow spec §18: folder, shortcut, Daily Start Behavior, default
+//  headers, date heading, a small set of editor preferences, app behavior,
+//  Git, agent-file refresh, updates. No AI settings anywhere (§18.8).
+//
+
 import AppKit
 import SwiftUI
 
-/// Phase 4 slice of Settings: the global shortcut and window/app behavior (§18.2, §18.6).
-/// The full Settings surface (folder, editor, daily start, Git) arrives with Phase 7.
 struct SettingsView: View {
 
-    @Environment(FolderStore.self) private var folderStore
+    var body: some View {
+        TabView {
+            GeneralSettingsView()
+                .tabItem { Label("General", systemImage: "gearshape") }
+            DailyStickySettingsView()
+                .tabItem { Label("Daily Sticky", systemImage: "note.text") }
+            EditorSettingsView()
+                .tabItem { Label("Editor", systemImage: "textformat") }
+            FolderSettingsView()
+                .tabItem { Label("Folder", systemImage: "folder") }
+            UpdateSettingsView()
+                .tabItem { Label("Updates", systemImage: "arrow.down.circle") }
+        }
+        .frame(width: 460)
+    }
+}
+
+// MARK: - General
+
+struct GeneralSettingsView: View {
+
     @Environment(AppSettings.self) private var settings
 
     var body: some View {
@@ -38,95 +66,118 @@ struct SettingsView: View {
                     .font(DS.Text.caption)
                     .foregroundStyle(DS.Color.textSecondary)
             }
-
-            Section("PeteKM Folder") {
-                Text(folderStore.lastKnownPath ?? "No folder set.")
-                    .font(DS.Text.monoCaption)
-                    .foregroundStyle(DS.Color.textSecondary)
-                    .textSelection(.enabled)
-            }
-
-            if case .ready(let folder) = folderStore.state {
-                GitSettingsSection(folder: folder)
-            }
         }
         .formStyle(.grouped)
-        .frame(width: 420)
-        .fixedSize(horizontal: false, vertical: true)
+        .settingsPane()
     }
 }
 
-/// Git stays optional (§17.1). Nothing here can block capture: the worst case
-/// is a line of text saying what didn't happen.
-private struct GitSettingsSection: View {
+// MARK: - Daily Sticky
 
-    let folder: PeteKMFolder
+struct DailyStickySettingsView: View {
 
-    @State private var isRepository = false
-    @State private var remote: String?
-    @State private var status: String?
-    @State private var isWorking = false
+    @Environment(AppSettings.self) private var settings
 
     var body: some View {
-        Section("Git") {
-            if !GitSupport.isGitAvailable {
-                Text("Git isn't available.")
-                    .font(DS.Text.caption)
-                    .foregroundStyle(DS.Color.textSecondary)
-            } else if isRepository {
-                Text(remote.map { "Remote: \($0)" } ?? "No Git remote set.")
-                    .font(DS.Text.caption)
-                    .foregroundStyle(DS.Color.textSecondary)
-                Button("Git Sync") { sync() }
-                    .disabled(isWorking)
-                Text("Commits everything, then pushes. PeteKM never pulls, merges, or rebases.")
-                    .font(DS.Text.caption)
-                    .foregroundStyle(DS.Color.textSecondary)
-            } else {
-                Text("This PeteKM folder isn't a Git repository.")
-                    .font(DS.Text.caption)
-                    .foregroundStyle(DS.Color.textSecondary)
-                Button("Initialize Repository") { initialize() }
-                    .disabled(isWorking)
-            }
+        @Bindable var settings = settings
 
-            if let status {
-                Text(status)
+        Form {
+            Section("New Day") {
+                Picker("Daily Start Behavior", selection: $settings.dailyStartBehavior) {
+                    ForEach(DailyStartBehavior.allCases) { behavior in
+                        Text(behavior.title).tag(behavior)
+                    }
+                }
+                Text(settings.dailyStartBehavior.detail)
+                    .font(DS.Text.caption)
+                    .foregroundStyle(DS.Color.textSecondary)
+
+                Toggle("Start each Daily Sticky with the date", isOn: $settings.showDateHeading)
+                Text("An H1 like \"# August 20, 2026\" at the top of the file.")
                     .font(DS.Text.caption)
                     .foregroundStyle(DS.Color.textSecondary)
             }
+
+            Section("Default Headers") {
+                TextEditor(text: $settings.defaultHeaders)
+                    .font(.system(.body, design: .monospaced))
+                    .frame(minHeight: 120)
+                Text("Plain Markdown. Used when Daily Start Behavior is \"Use default headers\".")
+                    .font(DS.Text.caption)
+                    .foregroundStyle(DS.Color.textSecondary)
+            }
         }
-        .onAppear(perform: refresh)
+        .formStyle(.grouped)
+        .settingsPane()
+    }
+}
+
+// MARK: - Editor
+
+struct EditorSettingsView: View {
+
+    @Environment(AppSettings.self) private var settings
+
+    /// Family names only, and only fonts that can actually render notes.
+    private var fontFamilies: [String] {
+        NSFontManager.shared.availableFontFamilies.sorted()
     }
 
-    private func refresh() {
-        isRepository = GitSupport.isRepository(folder)
-        remote = isRepository ? GitSupport.remoteName(of: folder) : nil
-    }
+    var body: some View {
+        @Bindable var settings = settings
 
-    private func initialize() {
-        isWorking = true
-        let folder = folder
-        Task {
-            let ok = await Task.detached(priority: .utility) {
-                GitSupport.initializeRepository(at: folder)
-            }.value
-            status = ok ? "Repository initialized." : "Git init failed."
-            isWorking = false
-            refresh()
-        }
-    }
+        Form {
+            Section("Text") {
+                Picker("Font", selection: Binding(
+                    get: { settings.editorFontName ?? "" },
+                    set: { settings.editorFontName = $0.isEmpty ? nil : $0 }
+                )) {
+                    Text("System").tag("")
+                    Divider()
+                    ForEach(fontFamilies, id: \.self) { family in
+                        Text(family).tag(family)
+                    }
+                }
 
-    private func sync() {
-        isWorking = true
-        let folder = folder
-        Task {
-            let outcome = await Task.detached(priority: .utility) {
-                GitSupport.sync(folder)
-            }.value
-            status = outcome.notice
-            isWorking = false
-            refresh()
+                Picker("Size", selection: $settings.editorFontSize) {
+                    ForEach(AppSettings.editorFontSizes, id: \.self) { size in
+                        Text("\(Int(size)) pt").tag(size)
+                    }
+                }
+
+                Slider(value: $settings.editorLineSpacing, in: 0...12, step: 1) {
+                    Text("Line spacing")
+                } minimumValueLabel: {
+                    Text("0")
+                } maximumValueLabel: {
+                    Text("12")
+                }
+            }
+
+            Section("Behavior") {
+                Toggle("Show table of contents", isOn: $settings.showTableOfContents)
+                Toggle("Auto-close brackets and quotes", isOn: $settings.autoClosePairs)
+                Toggle("Continue lists on Return", isOn: $settings.continueListMarkers)
+                Text("Markdown markers stay visible while you type. PeteKM never hides syntax.")
+                    .font(DS.Text.caption)
+                    .foregroundStyle(DS.Color.textSecondary)
+            }
         }
+        .formStyle(.grouped)
+        .settingsPane()
     }
+}
+
+// MARK: - Shared layout
+
+private struct SettingsPane: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .frame(width: 460)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+extension View {
+    func settingsPane() -> some View { modifier(SettingsPane()) }
 }

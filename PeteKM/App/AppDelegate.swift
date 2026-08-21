@@ -28,6 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         observeSettings()
         observeFolder()
+        UpdateController.shared.apply(settings: settings)
 
         controller.summon()
     }

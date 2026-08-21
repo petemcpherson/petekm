@@ -26,6 +26,15 @@ enum FolderInitializer {
         var failed: [String] = []
 
         var isEmpty: Bool { created.isEmpty && kept.isEmpty && backedUp.isEmpty && failed.isEmpty }
+
+        /// One terse line for the UI — counts, no congratulations (DESIGN §39).
+        var summary: String {
+            var parts: [String] = []
+            if !created.isEmpty { parts.append("Wrote \(created.count).") }
+            if !backedUp.isEmpty { parts.append("Backed up \(backedUp.count).") }
+            if !failed.isEmpty { parts.append("Couldn't write \(failed.count).") }
+            return parts.isEmpty ? "Already up to date." : parts.joined(separator: " ")
+        }
     }
 
     /// Create everything a PeteKM folder needs. Safe to run against a folder

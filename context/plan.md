@@ -10,7 +10,7 @@ Derived from `context/spec.md` (product behavior) and `context/DESIGN.md` (visua
 - [x] Phase 4 — App lifecycle: global shortcut, window character, menu bar
 - [x] Phase 5 — Command palette & local search
 - [x] Phase 6 — External tools: VS Code, Terminal, Finder, Git
-- [ ] Phase 7 — Settings, agent-file refresh, distribution & updates
+- [x] Phase 7 — Settings, agent-file refresh, distribution & updates
 
 ---
 
@@ -170,7 +170,7 @@ Goal: filesystem-as-interface actions; all failures degrade, never block capture
 
 ---
 
-## Phase 7 — Settings, agent-file refresh, distribution & updates
+## Phase 7 — Settings, agent-file refresh, distribution & updates — [COMPLETED]
 
 Goal: focused Settings surface (§18), deliberate template refresh, shippable app.
 
@@ -195,6 +195,8 @@ Goal: focused Settings surface (§18), deliberate template refresh, shippable ap
 - Vocabulary audit against `DESIGN.md` §2: Daily Sticky / Library / PeteKM exactly; terse copy, no persona, no motivational phrasing.
 
 **Done when:** every §24 criterion checked; signed, notarized build updates itself via Sparkle.
+
+**Outcome:** tabbed Settings (General / Daily Sticky / Editor / Folder / Updates), folder change + Refresh Agent Files, Sparkle behind `canImport`, `scripts/release.sh`, `context/DISTRIBUTION.md`, `context/ACCEPTANCE.md`. Open items live in ACCEPTANCE.md "Known gaps": UI tests need interactive Automation permission, Sparkle package + `SUFeedURL` are release-time steps, signing/notarization unverified locally.
 
 ---
 

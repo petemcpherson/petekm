@@ -47,6 +47,7 @@ final class AppSettings {
         static let showDateHeading = "petekm.showDateHeading"
         static let globalShortcut = "petekm.globalShortcut"
         static let hasCompletedOnboarding = "petekm.hasCompletedOnboarding"
+        static let editorFontName = "petekm.editorFontName"
         static let editorFontSize = "petekm.editorFontSize"
         static let editorLineSpacing = "petekm.editorLineSpacing"
         static let showTableOfContents = "petekm.showTableOfContents"
@@ -55,6 +56,7 @@ final class AppSettings {
         static let floatOnTop = "petekm.floatOnTop"
         static let hideDockIcon = "petekm.hideDockIcon"
         static let hideMenuBarItem = "petekm.hideMenuBarItem"
+        static let automaticUpdateChecks = "petekm.automaticUpdateChecks"
     }
 
     static let suggestedShortcut = KeyCombo.suggested
@@ -70,7 +72,9 @@ final class AppSettings {
         showDateHeading = defaults.object(forKey: Keys.showDateHeading) as? Bool ?? true
         globalShortcut = defaults.string(forKey: Keys.globalShortcut).flatMap(KeyCombo.init(storageValue:))
         hasCompletedOnboarding = defaults.bool(forKey: Keys.hasCompletedOnboarding)
+        editorFontName = defaults.string(forKey: Keys.editorFontName)
         editorFontSize = defaults.object(forKey: Keys.editorFontSize) as? Double ?? 13
+        automaticUpdateChecks = defaults.object(forKey: Keys.automaticUpdateChecks) as? Bool ?? true
         editorLineSpacing = defaults.object(forKey: Keys.editorLineSpacing) as? Double ?? 4
         showTableOfContents = defaults.object(forKey: Keys.showTableOfContents) as? Bool ?? false
         autoClosePairs = defaults.object(forKey: Keys.autoClosePairs) as? Bool ?? true
@@ -128,8 +132,18 @@ final class AppSettings {
 
     // MARK: - Editor (§18.6)
 
+    /// Font family for the editor. `nil` means the system font (§18.6).
+    var editorFontName: String? {
+        didSet { defaults.set(editorFontName, forKey: Keys.editorFontName) }
+    }
+
     var editorFontSize: Double {
         didSet { defaults.set(editorFontSize, forKey: Keys.editorFontSize) }
+    }
+
+    /// Background update checks (§20.2). Installing always needs consent.
+    var automaticUpdateChecks: Bool {
+        didSet { defaults.set(automaticUpdateChecks, forKey: Keys.automaticUpdateChecks) }
     }
 
     var editorLineSpacing: Double {
@@ -150,8 +164,13 @@ final class AppSettings {
     }
 
     var editorStyle: MarkdownStyle {
-        MarkdownStyle(fontSize: CGFloat(editorFontSize), lineSpacing: CGFloat(editorLineSpacing))
+        MarkdownStyle(fontSize: CGFloat(editorFontSize),
+                      lineSpacing: CGFloat(editorLineSpacing),
+                      fontName: editorFontName)
     }
+
+    /// Font sizes offered in Settings — a short list beats a stepper here.
+    static let editorFontSizes: [Double] = [11, 12, 13, 14, 15, 16, 18, 20]
 
     static let starterHeaders = """
     ## Work
