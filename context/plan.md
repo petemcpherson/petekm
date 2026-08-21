@@ -5,7 +5,7 @@ Derived from `context/spec.md` (product behavior) and `context/DESIGN.md` (visua
 ## Progress Tracker
 
 - [x] Phase 1 — Foundation: strip template, folder access, onboarding & folder initialization
-- [ ] Phase 2 — Daily Sticky core: file model, autosave, external-edit safety
+- [x] Phase 2 — Daily Sticky core: file model, autosave, external-edit safety
 - [ ] Phase 3 — Markdown editor experience
 - [ ] Phase 4 — App lifecycle: global shortcut, window character, menu bar
 - [ ] Phase 5 — Command palette & local search
@@ -48,7 +48,7 @@ Goal: app launches, user picks or creates a PeteKM folder, folder is fully initi
 
 ---
 
-## Phase 2 — Daily Sticky core: file model, autosave, external-edit safety
+## Phase 2 — Daily Sticky core: file model, autosave, external-edit safety — [COMPLETED]
 
 Goal: today's Daily Sticky exists, opens, saves, and survives concurrent editors. Plain-text editor is acceptable at this phase.
 

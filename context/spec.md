@@ -8,135 +8,6 @@
 
 ---
 
-# 0. Open Decisions (answer inline, then fold into spec)
-
-Gap-analysis 2026-08-20. Type answers under each item; once resolved, the decision gets merged into the relevant section and removed from here.
-
-## 0.1 Blocking — these shape the architecture
-
-### 0.1.1 App lifecycle
-
-The global shortcut only works while the app is running. Unspecified:
-
-- Launch at login (on by default? a setting?)?
-- Regular Dock app, or agent-style app with no Dock icon (`LSUIElement`)?
-- What does the red close button do — hide the window or quit the app?
-- What does ⌘Q do?
-
-**Answer:**
-
-i don't care about launch at login, but yes--the app should largely remain open in the background. command-q should ACTUALLY quit, but maybe command-w simply closes. there should be an option in settings to hide the dock icon, ideally.
-
-### 0.1.2 How the app actually runs RoboPete
-
-**Resolved 2026-08-20, folded into §13–§15:** The app has **zero AI functionality** — it never invokes, launches, monitors, or parses any AI agent. Filing happens in the user's own terminal against the PeteKM folder. The app's only role is generating the agent-facing files at onboarding. The "RoboPete" persona is removed everywhere; skills are named `/petekm-*`; librarian policy lives in `AGENTS.md` (no `ROBOPETE.md`); state file is `.petekm-state.json`.
-
-### 0.1.3 "File with RoboPete" vs "Process Daily Sticky" — one command or two?
-
-**Resolved 2026-08-20 — moot.** The app has no AI commands (0.1.2). Which days a skill processes is a skill-authoring detail inside `/petekm-process-today` / `/petekm-process-date`, not app behavior.
-
-## 0.2 Missing decisions
-
-### 0.2.1 Template upgrade path
-
-The app ships `CLAUDE.md`, `AGENTS.md`, and the `.claude/skills/petekm-*` templates. A new app version improves them, but existing PeteKM folders hold old copies and §19.2 forbids overwriting. How do updates propagate — versioned templates with an "update agent files?" prompt, or never touched after initial creation?
-
-**Answer:**
-
-### 0.2.2 Pasted images / attachments
-
-User pastes a screenshot into the Daily Sticky — then what? The spec is Markdown-only and defines no assets folder. Options: unsupported in v1 (paste inserts nothing / plain text only), or an `attachments/` convention with a Markdown image link.
-
-**Answer:**
-
-### 0.2.3 App update mechanism
-
-No App Store (§20.1) means no built-in update channel. Sparkle, manual download, or nothing for v1?
-
-**Answer:**
-
-### 0.2.4 Editing past Daily Stickies in-app
-
-User opens `2026-08-12.md` via **Open Date…** — editable or read-only in the app? The immutability rule targets AI only; §8.5 implies humans may edit history, but the UX intent is unstated.
-
-**Answer:**
-
-### 0.2.5 Menu-bar item: v1 or not?
-
-Spec §25 defers "menu-bar-only mode" to the future; `DESIGN.md` §6/§25/§57 spec a menu-bar glyph as if it exists. Does v1 ship a menu-bar (status) item at all?
-
-**Answer:**
-
-## 0.3 Ambiguities to pin down
-
-### 0.3.1 Search scope of root files
-
-Does **Search All PeteKM** cover `INBOX.md`, `CLAUDE.md`, `AGENTS.md`? §11.1 lists daily + Library only. `INBOX.md` probably should be searchable.
-
-**Answer:**
-
-### 0.3.2 Conflict UI minimum shape
-
-§19.4 requires a "clear conflict path" but describes no choices. Minimum viable answer needed for the plan (e.g. keep mine / keep disk / keep both as a copy).
-
-**Answer:**
-
-### 0.3.3 Git Sync — pull, or one-way?
-
-Git Sync = commit & push. If the remote is ahead, push fails — then what? If v1 never pulls, say so explicitly ("v1 backup is one-way; fix divergence in a real Git tool").
-
-**Answer:**
-
-### 0.3.4 Missing PeteKM folder at launch
-
-Folder on a disconnected drive / renamed / iCloud-evicted. What does the app show, and what's the recovery flow?
-
-**Answer:**
-
-### 0.3.5 Carry-forward with no prior sticky
-
-First day ever, or behavior set to carry-forward with an empty `daily/`. Fallback = start from scratch? Implied by §7.4, never stated.
-
-**Answer:**
-
-### 0.3.6 INDEX.md initial content
-
-Brand-new folder: empty file, or placeholder header? Adopting an existing folder: suggest the user run `/petekm-rebuild-index` in their terminal?
-
-**Answer:**
-
-## 0.4 Stale / contradictory bits to clean up
-
-### 0.4.1 DESIGN.md needs a full RoboPete sweep
-
-**Resolved 2026-08-20 — sweep done.** RoboPete persona, "Ask RoboPete", AI commands, run/progress UI, AI feedback strings, RoboPete menu, and RoboPete settings all removed from `DESIGN.md`. The pixel-art portrait survives as the **PeteKM pixel mark** — pure brand mark (app icon, About, onboarding, empty states, menu-bar glyph), never presented as a character or AI persona. Asset files keep their historical `robopete-*` filenames.
-
-### 0.4.2 `.petekm-cache/` never defined
-
-Appears in the default `.gitignore` (§6.2) but is specified nowhere. Either spec it (rebuildable cache lives at the folder root under that name) or drop the line.
-
-**Answer:**
-
-### 0.4.3 RoboPete progress bar can't have a real percentage
-
-**Resolved 2026-08-20 — moot.** No in-app agent runs (0.1.2), so no run UI, progress bar, or agent feedback exists. Covered by the 0.4.1 DESIGN.md sweep.
-
-## 0.5 Confirm these are intentional (yes/no is enough)
-
-### 0.5.1 No deletion/archival of old Daily Stickies — `daily/` stays flat forever (§5.1).
-
-**Answer:**
-
-### 0.5.2 Editor undo history is lost across app restarts.
-
-**Answer:**
-
-### 0.5.3 No export feature ever — the filesystem *is* the export (§27 rule 10).
-
-**Answer:**
-
----
-
 ## 1. Product Summary
 
 This product is a small, fast, native macOS note-capture application built around one core behavior:
@@ -628,6 +499,8 @@ However:
 
 No user-authored note content may exist only in a cache.
 
+App-owned caches and indexes live in the app's own Application Support area, keyed to the selected PeteKM folder — **not inside the PeteKM folder itself**. The folder stays clean: only knowledge files, agent files, and `.petekm-state.json`.
+
 ---
 
 # 6. First-Run Onboarding and PeteKM Folder Setup
@@ -677,12 +550,28 @@ The default `.gitignore` contains:
 ```gitignore
 .petekm-state.json
 .DS_Store
-.petekm-cache/
 ```
 
 Everything else — including `.claude/skills/`, `CLAUDE.md`, `AGENTS.md`, and `INDEX.md` — is intended to be committed, so a clone of the repo is a fully working, agent-ready PeteKM folder.
 
 The application should therefore provide a usable agent-ready PeteKM folder even before the user opens Claude Code.
+
+The initial `INDEX.md` is a placeholder, not an empty file:
+
+```md
+# Library Index
+
+The Library is empty so far. This index is maintained by the filing skills;
+run /petekm-rebuild-index to regenerate it at any time.
+```
+
+When adopting an existing folder, `INDEX.md` is created (with this placeholder) only if missing; if the Library already has content, onboarding may suggest running `/petekm-rebuild-index` in the terminal.
+
+## 6.5 Agent-file updates after setup
+
+The templates (`CLAUDE.md`, `AGENTS.md`, `.claude/skills/petekm-*`) are **written once at setup and never auto-updated**. A new app version does not touch existing PeteKM folders.
+
+Settings provides a manual **Refresh Agent Files** action: it rewrites the current templates, first backing up any existing differing file alongside it (e.g. `AGENTS.md.bak-2026-08-20`). This keeps §19.2's no-silent-overwrite rule while giving users a way to adopt improved templates deliberately.
 
 ## 6.3 Git setup
 
@@ -806,6 +695,8 @@ Today may begin as:
 
 The H1 date heading should reflect today rather than being copied literally.
 
+If no prior Daily Sticky exists (first day ever, or an empty `daily/`), carry-forward silently falls back to **start from scratch** (§7.6). No error, no prompt.
+
 ## 7.5 Default headers
 
 Settings should allow the user to define a reusable daily structure.
@@ -928,6 +819,32 @@ The capture window behaves like a persistent sticky, not a document window (see 
 
 Window geometry, opacity, and color are application state, not note data.
 
+## 8.7 App lifecycle
+
+The app is a background-resident capture tool:
+
+- The app stays running after its window is closed — the global shortcut must keep working all day.
+- The red close button and ⌘W **hide the window**; the app keeps running.
+- ⌘Q **actually quits** the app.
+- Settings includes a toggle to **hide the Dock icon** (agent-style/`LSUIElement` behavior). When the Dock icon is hidden, the menu-bar item (§8.8) cannot also be hidden — at least one entry point must remain visible.
+- Launch-at-login is not an app feature in v1; users who want it can add the app in System Settings › Login Items.
+
+## 8.8 Menu-bar item
+
+v1 ships a menu-bar (status) item using the PeteKM pixel-mark glyph. Its menu is small:
+
+- **Open Daily Sticky** (same as the global shortcut)
+- **Search All PeteKM…**
+- **Reveal PeteKM Folder in Finder**
+- **Settings…**
+- **Quit PeteKM**
+
+Settings includes a toggle to hide the menu-bar item, subject to the §8.7 rule that Dock icon and menu-bar item may not both be hidden.
+
+## 8.9 Past Daily Stickies are editable
+
+Opening a past Daily Sticky (via **Open Date…** or search) presents a fully editable document, identical to today's. The immutability rule (§2.5) binds **AI agents only** — humans may correct or amend their own history. The app adds no read-only mode, lock, or warning for past days.
+
 ---
 
 # 9. Markdown Editor Experience
@@ -1042,6 +959,14 @@ Not initially required:
 - comments;
 - real-time multiplayer.
 
+## 9.6 Pasted images and attachments
+
+Not supported in v1. The system is Markdown-text-only: pasting an image inserts nothing (paste is plain-text only), and no `attachments/` convention exists. An attachments convention is a future possibility (§25).
+
+## 9.7 Undo history
+
+Editor undo/redo is standard in-memory text-editing undo. It is not persisted — quitting the app clears undo history. Long-term recovery is Git's job (§17), not the editor's.
+
 ---
 
 # 10. Command Palette
@@ -1117,10 +1042,13 @@ Search should be able to cover:
 
 - Daily Stickies;
 - Library files;
+- root-level Markdown files (`INBOX.md`, `INDEX.md`, `CLAUDE.md`, `AGENTS.md`);
 - filenames;
 - folder names;
 - Markdown headings;
 - full text inside Markdown files.
+
+The rule is simple: **every `.md` file in the PeteKM folder is searchable**, excluding hidden directories (`.claude/`, `.git/`). No special-casing per file.
 
 Search should not be limited to filenames.
 
@@ -1652,7 +1580,7 @@ Example:
 
 The app does not need to reproduce the second experience inside its own search UI.
 
-**Decided:** the app contains **no embedded AI chat, no "Ask RoboPete…" command, and no app-owned AI integration or API** — not just in v1, but as a standing boundary. The only way AI interacts with the PeteKM system is through the user's own AI coding agents (Claude Code, Codex, etc.) operating on the local files — typically by opening a terminal, `cd`-ing into the PeteKM folder, and invoking the agent there. (`DESIGN.md` §17's "Ask RoboPete…" command is superseded by this decision.)
+**Decided:** the app contains **no embedded AI chat, no ask-the-AI command, and no app-owned AI integration or API** — not just in v1, but as a standing boundary. The only way AI interacts with the PeteKM system is through the user's own AI coding agents (Claude Code, Codex, etc.) operating on the local files — typically by opening a terminal, `cd`-ing into the PeteKM folder, and invoking the agent there.
 
 ---
 
@@ -1690,6 +1618,8 @@ PeteKM backup 2026-08-19 20:45
 ```
 
 The history is primarily for backup and recovery, not perfect semantic commit archaeology.
+
+**Git Sync is one-way in v1: commit, then push.** The app never pulls, merges, or rebases. If the push fails (remote ahead, auth failure, no network), the local commit still succeeds; the app shows a brief non-blocking notice — e.g. "Committed locally. Push failed — resolve in a Git tool." — and capture continues unaffected (§17.4). Divergence is fixed in a real Git tool, not in the app.
 
 ## 17.3 AI + Git
 
@@ -1795,6 +1725,13 @@ Potential settings:
 
 Advanced Git settings can remain outside the initial release.
 
+## 18.10 App behavior
+
+- Hide Dock icon (§8.7)
+- Hide menu-bar item (§8.8) — disabled while the Dock icon is hidden
+- Refresh Agent Files (§6.5)
+- Check for updates (§20.2)
+
 ---
 
 # 19. File and Data Safety
@@ -1828,13 +1765,33 @@ The product should protect against truncated or lost Daily Stickies.
 
 If the currently open note changes externally while the user has unsaved local changes, the app should not silently choose one version and destroy the other.
 
-A clear conflict path is required.
+If there are no unsaved local changes, the app silently reloads the file — no dialog. A real conflict (both sides changed) presents exactly three choices:
+
+- **Keep Mine** — save the in-app version, overwriting disk.
+- **Keep Disk** — discard in-app changes, reload the disk version.
+- **Keep Both** — save the in-app version and write the disk version alongside as `<name> (conflict YYYY-MM-DD HHmm).md`.
+
+Keep Both is the safe default (Enter). No merge UI, no diff view — Git and VS Code exist for that.
 
 ## 19.5 AI safety boundary
 
 The most important AI boundary is filesystem scope.
 
 The agent’s routine filing behavior should operate inside the selected PeteKM folder and should not need to modify arbitrary files elsewhere on the computer.
+
+## 19.6 Missing PeteKM folder at launch
+
+If the configured PeteKM folder is unreachable (disconnected drive, renamed, moved, iCloud-evicted), the app must not crash, must not silently create a new empty folder, and must not write anywhere else. It shows a single blocking panel:
+
+> Can't find your PeteKM folder at `<last known path>`.
+
+with three options:
+
+- **Locate Folder…** — folder picker; re-establish the bookmark and continue.
+- **Choose or Create a New Folder…** — re-enter the §6.1 onboarding choice.
+- **Quit**
+
+The global shortcut summons this panel (instead of the editor) until resolved. Nothing is auto-created at the old path.
 
 ---
 
@@ -1861,6 +1818,10 @@ Consequences:
 - The App Sandbox is **disabled**, because the product requires shelling out to `git`, `code`, and `claude` (§12, §15, §17) and read/write access to a user-chosen folder.
 - The app still keeps security-scoped-bookmark-style discipline for the user-chosen PeteKM folder: persist access via a bookmark, never assume ambient filesystem access beyond what the user granted.
 - The Xcode project's `ENABLE_USER_SELECTED_FILES = readonly` setting must be corrected as part of implementing folder access.
+
+## 20.2 App updates
+
+The app uses **Sparkle** for in-app updates (standard for direct-distribution macOS apps): background update check, user-approved install. No auto-install without consent; update checks must never block or delay capture.
 
 ---
 
@@ -2183,7 +2144,8 @@ Potential future additions:
 - a read-only filing activity/history panel (derived from Git, no agent integration);
 - local backlinks inferred from ordinary Markdown text;
 - better semantic search using a fully local index;
-- menu-bar-only mode;
+- pasted images / an `attachments/` convention (§9.6);
+- launch-at-login as an in-app setting;
 - quick capture from macOS Services/Share Sheet;
 - iCloud/Dropbox folder compatibility;
 - lightweight Library-file viewing inside the app;
