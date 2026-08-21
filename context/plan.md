@@ -6,7 +6,7 @@ Derived from `context/spec.md` (product behavior) and `context/DESIGN.md` (visua
 
 - [x] Phase 1 — Foundation: strip template, folder access, onboarding & folder initialization
 - [x] Phase 2 — Daily Sticky core: file model, autosave, external-edit safety
-- [ ] Phase 3 — Markdown editor experience
+- [x] Phase 3 — Markdown editor experience
 - [ ] Phase 4 — App lifecycle: global shortcut, window character, menu bar
 - [ ] Phase 5 — Command palette & local search
 - [ ] Phase 6 — External tools: VS Code, Terminal, Finder, Git
@@ -79,7 +79,7 @@ Goal: today's Daily Sticky exists, opens, saves, and survives concurrent editors
 
 ---
 
-## Phase 3 — Markdown editor experience
+## Phase 3 — Markdown editor experience — [COMPLETED]
 
 Goal: editor feels markedly nicer than a raw text area while keeping syntax visible (§9).
 

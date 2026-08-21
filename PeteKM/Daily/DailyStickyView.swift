@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-/// The Daily Sticky window contents. Plain-text editing for now — live Markdown styling is Phase 3 (§9).
+/// The Daily Sticky window contents: live-styled Markdown editor with a heading outline (§9).
 struct DailyStickyView: View {
     @Environment(FolderStore.self) private var folderStore
     @Environment(AppSettings.self) private var settings
@@ -9,6 +9,7 @@ struct DailyStickyView: View {
     let folder: PeteKMFolder
 
     @State private var session: DailySession?
+    @State private var editorController = EditorController()
 
     var body: some View {
         Group {
@@ -61,6 +62,12 @@ struct DailyStickyView: View {
                 .font(DS.Text.monoCaption)
                 .foregroundStyle(DS.Color.textTertiary)
             Spacer(minLength: 0)
+            Toggle(isOn: Binding(get: { settings.showTableOfContents },
+                                 set: { settings.showTableOfContents = $0 })) {
+                Image(systemName: "list.bullet")
+            }
+            .toggleStyle(.button)
+            .help("Table of Contents")
             if let error = session.document?.lastError ?? session.lastError {
                 Text(error)
                     .font(DS.Text.caption)
@@ -76,7 +83,16 @@ struct DailyStickyView: View {
     @ViewBuilder
     private func editor(_ session: DailySession) -> some View {
         if let document = session.document {
-            StickyTextEditor(document: document)
+            HStack(spacing: 0) {
+                if settings.showTableOfContents {
+                    TableOfContentsView(entries: MarkdownOutline.entries(in: document.text)) { entry in
+                        editorController.reveal(entry.range)
+                    }
+                    Divider()
+                }
+                StickyTextEditor(document: document, settings: settings, controller: editorController)
+                    .id(document.url)
+            }
         } else {
             Spacer()
         }
@@ -85,14 +101,29 @@ struct DailyStickyView: View {
 
 private struct StickyTextEditor: View {
     @Bindable var document: StickyDocument
+    let settings: AppSettings
+    let controller: EditorController
+
+    private let cursors = CursorMemory()
+
+    init(document: StickyDocument, settings: AppSettings, controller: EditorController) {
+        _document = Bindable(document)
+        self.settings = settings
+        self.controller = controller
+        // Restored before the text view is built, so the caret lands where the user left it (§8.3).
+        controller.initialSelection = CursorMemory().selection(for: document.url)
+    }
 
     var body: some View {
-        TextEditor(text: $document.text)
-            .font(.system(size: 13, design: .monospaced))
-            .scrollContentBackground(.hidden)
-            .background(DS.Color.surfaceWindow)
-            .padding(.horizontal, DS.Space.s5)
-            .padding(.vertical, DS.Space.s4)
+        MarkdownEditor(
+            text: $document.text,
+            style: settings.editorStyle,
+            autoClosePairs: settings.autoClosePairs,
+            continueListMarkers: settings.continueListMarkers,
+            controller: controller,
+            onSelectionChange: { cursors.remember($0, for: document.url) }
+        )
+        .background(DS.Color.surfaceWindow)
     }
 }
 

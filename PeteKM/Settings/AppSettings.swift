@@ -47,6 +47,11 @@ final class AppSettings {
         static let showDateHeading = "petekm.showDateHeading"
         static let globalShortcut = "petekm.globalShortcut"
         static let hasCompletedOnboarding = "petekm.hasCompletedOnboarding"
+        static let editorFontSize = "petekm.editorFontSize"
+        static let editorLineSpacing = "petekm.editorLineSpacing"
+        static let showTableOfContents = "petekm.showTableOfContents"
+        static let autoClosePairs = "petekm.autoClosePairs"
+        static let continueListMarkers = "petekm.continueListMarkers"
     }
 
     static let suggestedShortcut = "⌃⌥Space"
@@ -62,6 +67,11 @@ final class AppSettings {
         showDateHeading = defaults.object(forKey: Keys.showDateHeading) as? Bool ?? true
         globalShortcut = defaults.string(forKey: Keys.globalShortcut)
         hasCompletedOnboarding = defaults.bool(forKey: Keys.hasCompletedOnboarding)
+        editorFontSize = defaults.object(forKey: Keys.editorFontSize) as? Double ?? 13
+        editorLineSpacing = defaults.object(forKey: Keys.editorLineSpacing) as? Double ?? 4
+        showTableOfContents = defaults.object(forKey: Keys.showTableOfContents) as? Bool ?? false
+        autoClosePairs = defaults.object(forKey: Keys.autoClosePairs) as? Bool ?? true
+        continueListMarkers = defaults.object(forKey: Keys.continueListMarkers) as? Bool ?? true
     }
 
     var dailyStartBehavior: DailyStartBehavior {
@@ -85,6 +95,33 @@ final class AppSettings {
 
     var hasCompletedOnboarding: Bool {
         didSet { defaults.set(hasCompletedOnboarding, forKey: Keys.hasCompletedOnboarding) }
+    }
+
+    // MARK: - Editor (§18.6)
+
+    var editorFontSize: Double {
+        didSet { defaults.set(editorFontSize, forKey: Keys.editorFontSize) }
+    }
+
+    var editorLineSpacing: Double {
+        didSet { defaults.set(editorLineSpacing, forKey: Keys.editorLineSpacing) }
+    }
+
+    /// The table of contents is collapsed by default (§9.4).
+    var showTableOfContents: Bool {
+        didSet { defaults.set(showTableOfContents, forKey: Keys.showTableOfContents) }
+    }
+
+    var autoClosePairs: Bool {
+        didSet { defaults.set(autoClosePairs, forKey: Keys.autoClosePairs) }
+    }
+
+    var continueListMarkers: Bool {
+        didSet { defaults.set(continueListMarkers, forKey: Keys.continueListMarkers) }
+    }
+
+    var editorStyle: MarkdownStyle {
+        MarkdownStyle(fontSize: CGFloat(editorFontSize), lineSpacing: CGFloat(editorLineSpacing))
     }
 
     static let starterHeaders = """
