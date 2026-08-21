@@ -45,9 +45,88 @@ struct SettingsView: View {
                     .foregroundStyle(DS.Color.textSecondary)
                     .textSelection(.enabled)
             }
+
+            if case .ready(let folder) = folderStore.state {
+                GitSettingsSection(folder: folder)
+            }
         }
         .formStyle(.grouped)
         .frame(width: 420)
         .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// Git stays optional (§17.1). Nothing here can block capture: the worst case
+/// is a line of text saying what didn't happen.
+private struct GitSettingsSection: View {
+
+    let folder: PeteKMFolder
+
+    @State private var isRepository = false
+    @State private var remote: String?
+    @State private var status: String?
+    @State private var isWorking = false
+
+    var body: some View {
+        Section("Git") {
+            if !GitSupport.isGitAvailable {
+                Text("Git isn't available.")
+                    .font(DS.Text.caption)
+                    .foregroundStyle(DS.Color.textSecondary)
+            } else if isRepository {
+                Text(remote.map { "Remote: \($0)" } ?? "No Git remote set.")
+                    .font(DS.Text.caption)
+                    .foregroundStyle(DS.Color.textSecondary)
+                Button("Git Sync") { sync() }
+                    .disabled(isWorking)
+                Text("Commits everything, then pushes. PeteKM never pulls, merges, or rebases.")
+                    .font(DS.Text.caption)
+                    .foregroundStyle(DS.Color.textSecondary)
+            } else {
+                Text("This PeteKM folder isn't a Git repository.")
+                    .font(DS.Text.caption)
+                    .foregroundStyle(DS.Color.textSecondary)
+                Button("Initialize Repository") { initialize() }
+                    .disabled(isWorking)
+            }
+
+            if let status {
+                Text(status)
+                    .font(DS.Text.caption)
+                    .foregroundStyle(DS.Color.textSecondary)
+            }
+        }
+        .onAppear(perform: refresh)
+    }
+
+    private func refresh() {
+        isRepository = GitSupport.isRepository(folder)
+        remote = isRepository ? GitSupport.remoteName(of: folder) : nil
+    }
+
+    private func initialize() {
+        isWorking = true
+        let folder = folder
+        Task {
+            let ok = await Task.detached(priority: .utility) {
+                GitSupport.initializeRepository(at: folder)
+            }.value
+            status = ok ? "Repository initialized." : "Git init failed."
+            isWorking = false
+            refresh()
+        }
+    }
+
+    private func sync() {
+        isWorking = true
+        let folder = folder
+        Task {
+            let outcome = await Task.detached(priority: .utility) {
+                GitSupport.sync(folder)
+            }.value
+            status = outcome.notice
+            isWorking = false
+            refresh()
+        }
     }
 }

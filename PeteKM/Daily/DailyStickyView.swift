@@ -12,6 +12,9 @@ struct DailyStickyView: View {
     @State private var editorController = EditorController()
     @State private var palette = PaletteModel()
     @State private var keyMonitor: Any?
+    /// Transient one-line result of an external-tool action (DESIGN §32).
+    @State private var notice: String?
+    @State private var noticeTask: Task<Void, Never>?
 
     var body: some View {
         Group {
@@ -51,7 +54,10 @@ struct DailyStickyView: View {
             palette.configure(folder: folder) { perform($0, session: session) }
             installPaletteShortcut()
         }
-        .onDisappear { removePaletteShortcut() }
+        .onDisappear {
+            removePaletteShortcut()
+            noticeTask?.cancel()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .peteKMOpenSearch)) { _ in
             palette.present(mode: .search)
         }
@@ -112,13 +118,63 @@ struct DailyStickyView: View {
             }
 
         case .revealFolderInFinder:
-            NSWorkspace.shared.activateFileViewerSelecting([folder.root])
+            ExternalTools.revealInFinder(folder.root)
 
         case .openSettings:
             NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+
+        case .openInEditor(let url):
+            openInEditor(url)
+
+        case .openCurrentFileInEditor:
+            guard let url = session.document?.url else {
+                show("No file is open.")
+                return
+            }
+            openInEditor(url)
+
+        case .openTerminalInFolder:
+            if !ExternalTools.openTerminal(at: folder.root) {
+                show(ExternalTools.terminalUnavailableNotice)
+            }
+
+        case .gitSync:
+            gitSync()
         }
 
         editorController.focusEditor()
+    }
+
+    // MARK: - External tools (§12, §15.1, §17)
+
+    private func openInEditor(_ url: URL) {
+        let editor = ExternalEditorProvider.current
+        let opened = FileWriting.isDirectory(url)
+            ? editor.open(folder: url)
+            : editor.open(file: url, in: folder.root)
+        if !opened { show(editor.unavailableNotice) }
+    }
+
+    /// Git runs off the main actor and only ever reports back with a line of
+    /// text — capture never waits on it (§17.4).
+    private func gitSync() {
+        let folder = folder
+        Task {
+            let outcome = await Task.detached(priority: .utility) {
+                GitSupport.sync(folder)
+            }.value
+            show(outcome.notice)
+        }
+    }
+
+    private func show(_ text: String) {
+        noticeTask?.cancel()
+        notice = text
+        noticeTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(6))
+            guard !Task.isCancelled else { return }
+            notice = nil
+        }
     }
 
     private func header(_ session: DailySession) -> some View {
@@ -155,6 +211,14 @@ struct DailyStickyView: View {
                     .foregroundStyle(DS.Color.error)
                     .lineLimit(1)
                     .help(error)
+            } else if let notice {
+                // External tools report here and then get out of the way.
+                Text(notice)
+                    .font(DS.Text.caption)
+                    .foregroundStyle(DS.Color.textSecondary)
+                    .lineLimit(1)
+                    .help(notice)
+                    .transition(.opacity)
             }
         }
         .padding(.horizontal, DS.Space.s6)

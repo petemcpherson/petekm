@@ -27,6 +27,86 @@ enum GitSupport {
         run(["--version"], in: URL(filePath: NSHomeDirectory(), directoryHint: .isDirectory)) != nil
     }
 
+    /// Name of the push remote, or nil when none is configured.
+    static func remoteName(of folder: PeteKMFolder) -> String? {
+        guard let output = run(["remote"], in: folder.root) else { return nil }
+        return output.split(separator: "\n").first.map(String.init)
+    }
+
+    // MARK: - Git Sync (§17.2)
+
+    /// What a sync attempt did. Every case is survivable: capture never depends
+    /// on any of this (§17.4).
+    enum SyncOutcome: Equatable {
+        case gitUnavailable
+        case notARepository
+        case nothingToCommit
+        case pushed
+        case committedNotPushed(reason: PushSkipReason)
+        case commitFailed
+
+        enum PushSkipReason: Equatable {
+            case noRemote
+            case pushFailed
+        }
+
+        /// Terse, no-apology notice (DESIGN §32).
+        var notice: String {
+            switch self {
+            case .gitUnavailable: return "Git isn't available."
+            case .notARepository: return "This PeteKM folder isn't a Git repository."
+            case .nothingToCommit: return "Nothing to commit."
+            case .pushed: return "Committed and pushed."
+            case .committedNotPushed(.noRemote): return "Committed locally. No Git remote set."
+            case .committedNotPushed(.pushFailed): return "Committed locally. Push failed — resolve in a Git tool."
+            case .commitFailed: return "Git commit failed."
+            }
+        }
+    }
+
+    /// `PeteKM backup 2026-08-19 20:45` (§17.2).
+    static func commitMessage(for date: Date, calendar: Calendar = .current, locale: Locale = Locale(identifier: "en_US_POSIX")) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.locale = locale
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        return "PeteKM backup \(formatter.string(from: date))"
+    }
+
+    /// Commit everything, then push. One-way by design: the app never pulls,
+    /// merges, or rebases (§17.2). Blocking — call it off the main actor.
+    static func sync(_ folder: PeteKMFolder, now: Date = Date(), calendar: Calendar = .current) -> SyncOutcome {
+        guard isGitAvailable else { return .gitUnavailable }
+        guard isRepository(folder) else { return .notARepository }
+
+        run(["add", "-A"], in: folder.root)
+
+        let dirty = run(["status", "--porcelain"], in: folder.root)?.isEmpty == false
+        if dirty {
+            guard run(["commit", "-m", commitMessage(for: now, calendar: calendar)], in: folder.root) != nil else {
+                return .commitFailed
+            }
+        }
+
+        guard let remote = remoteName(of: folder) else {
+            return dirty ? .committedNotPushed(reason: .noRemote) : .nothingToCommit
+        }
+
+        // No upstream yet on a fresh branch — set it once, still never pulling.
+        let branch = run(["rev-parse", "--abbrev-ref", "HEAD"], in: folder.root)
+        var arguments = ["push"]
+        if let branch, branch != "HEAD", run(["rev-parse", "--abbrev-ref", "@{upstream}"], in: folder.root) == nil {
+            arguments += ["--set-upstream", remote, branch]
+        }
+
+        guard run(arguments, in: folder.root) != nil else {
+            return .committedNotPushed(reason: .pushFailed)
+        }
+        // Pushing a clean tree is a no-op in the ordinary case; say what changed.
+        return dirty ? .pushed : .nothingToCommit
+    }
+
     /// Run a git subcommand, returning trimmed stdout, or nil if git is missing
     /// or exited non-zero.
     @discardableResult

@@ -9,7 +9,7 @@ Derived from `context/spec.md` (product behavior) and `context/DESIGN.md` (visua
 - [x] Phase 3 — Markdown editor experience
 - [x] Phase 4 — App lifecycle: global shortcut, window character, menu bar
 - [x] Phase 5 — Command palette & local search
-- [ ] Phase 6 — External tools: VS Code, Terminal, Finder, Git
+- [x] Phase 6 — External tools: VS Code, Terminal, Finder, Git
 - [ ] Phase 7 — Settings, agent-file refresh, distribution & updates
 
 ---
@@ -150,7 +150,7 @@ Goal: keyboard-first gateway to everything beyond typing (§10), plus fast deter
 
 ---
 
-## Phase 6 — External tools: VS Code, Terminal, Finder, Git
+## Phase 6 — External tools: VS Code, Terminal, Finder, Git — [COMPLETED]
 
 Goal: filesystem-as-interface actions; all failures degrade, never block capture (§12, §15, §17).
 

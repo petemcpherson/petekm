@@ -76,9 +76,16 @@ final class PaletteModel {
     private(set) var index: SearchIndex?
     private var onPerform: (PaletteOutcome) -> Void = { _ in }
     private let calendar: Calendar
+    private let editor: ExternalEditor
 
-    init(calendar: Calendar = .current) {
+    /// Sampled when the palette opens rather than per keystroke — both are disk
+    /// or Launch Services lookups (§10.2).
+    private(set) var isGitRepository = false
+    private(set) var isEditorAvailable = false
+
+    init(calendar: Calendar = .current, editor: ExternalEditor = ExternalEditorProvider.current) {
         self.calendar = calendar
+        self.editor = editor
     }
 
     // MARK: - Wiring
@@ -88,6 +95,24 @@ final class PaletteModel {
         guard self.folder != folder else { return }
         self.folder = folder
         self.index = SearchIndex(folder: folder)
+        refreshAvailability()
+    }
+
+    /// A command the folder can't perform is absent, not greyed out (§10.2).
+    func refreshAvailability() {
+        isEditorAvailable = editor.isAvailable
+        isGitRepository = folder.map(GitSupport.isRepository) ?? false
+    }
+
+    func isAvailable(_ command: PaletteCommandID) -> Bool {
+        switch command {
+        case .openLibraryInEditor, .openFolderInEditor, .openCurrentFileInEditor:
+            return isEditorAvailable
+        case .gitSync:
+            return isGitRepository
+        default:
+            return true
+        }
     }
 
     // MARK: - Presentation
@@ -97,6 +122,7 @@ final class PaletteModel {
         query = ""
         message = nil
         isPresented = true
+        refreshAvailability()
         reload()
         refreshIndex()
     }
@@ -189,6 +215,21 @@ final class PaletteModel {
             }
             perform(.openFile(folder.inbox, reveal: nil))
 
+        case .openLibraryInEditor:
+            perform(.openInEditor(folder.library))
+
+        case .openFolderInEditor:
+            perform(.openInEditor(folder.root))
+
+        case .openCurrentFileInEditor:
+            perform(.openCurrentFileInEditor)
+
+        case .openTerminal:
+            perform(.openTerminalInFolder)
+
+        case .gitSync:
+            perform(.gitSync)
+
         case .revealFolderInFinder:
             perform(.revealFolderInFinder)
 
@@ -225,6 +266,7 @@ final class PaletteModel {
 
     private func commandRows() -> [PaletteRow] {
         PaletteCommandID.allCases
+            .filter(isAvailable)
             .compactMap { command -> (PaletteCommandID, Int)? in
                 guard let score = FuzzyMatch.score(query, in: command.title) else { return nil }
                 return (command, score)
