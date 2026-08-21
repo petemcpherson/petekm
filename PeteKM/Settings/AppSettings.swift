@@ -52,9 +52,12 @@ final class AppSettings {
         static let showTableOfContents = "petekm.showTableOfContents"
         static let autoClosePairs = "petekm.autoClosePairs"
         static let continueListMarkers = "petekm.continueListMarkers"
+        static let floatOnTop = "petekm.floatOnTop"
+        static let hideDockIcon = "petekm.hideDockIcon"
+        static let hideMenuBarItem = "petekm.hideMenuBarItem"
     }
 
-    static let suggestedShortcut = "⌃⌥Space"
+    static let suggestedShortcut = KeyCombo.suggested
 
     private let defaults: UserDefaults
 
@@ -65,13 +68,17 @@ final class AppSettings {
         ) ?? .ask
         defaultHeaders = defaults.string(forKey: Keys.defaultHeaders) ?? AppSettings.starterHeaders
         showDateHeading = defaults.object(forKey: Keys.showDateHeading) as? Bool ?? true
-        globalShortcut = defaults.string(forKey: Keys.globalShortcut)
+        globalShortcut = defaults.string(forKey: Keys.globalShortcut).flatMap(KeyCombo.init(storageValue:))
         hasCompletedOnboarding = defaults.bool(forKey: Keys.hasCompletedOnboarding)
         editorFontSize = defaults.object(forKey: Keys.editorFontSize) as? Double ?? 13
         editorLineSpacing = defaults.object(forKey: Keys.editorLineSpacing) as? Double ?? 4
         showTableOfContents = defaults.object(forKey: Keys.showTableOfContents) as? Bool ?? false
         autoClosePairs = defaults.object(forKey: Keys.autoClosePairs) as? Bool ?? true
         continueListMarkers = defaults.object(forKey: Keys.continueListMarkers) as? Bool ?? true
+        floatOnTop = defaults.object(forKey: Keys.floatOnTop) as? Bool ?? false
+        hideDockIcon = defaults.object(forKey: Keys.hideDockIcon) as? Bool ?? false
+        hideMenuBarItem = defaults.object(forKey: Keys.hideMenuBarItem) as? Bool ?? false
+        if hideDockIcon { hideMenuBarItem = false }   // §8.7: both entry points may not be hidden
     }
 
     var dailyStartBehavior: DailyStartBehavior {
@@ -89,9 +96,31 @@ final class AppSettings {
     }
 
     /// None is pre-assigned (§8.2); nil means the user has not set one.
-    var globalShortcut: String? {
-        didSet { defaults.set(globalShortcut, forKey: Keys.globalShortcut) }
+    var globalShortcut: KeyCombo? {
+        didSet { defaults.set(globalShortcut?.storageValue, forKey: Keys.globalShortcut) }
     }
+
+    var floatOnTop: Bool {
+        didSet { defaults.set(floatOnTop, forKey: Keys.floatOnTop) }
+    }
+
+    /// Agent-style app with no Dock icon. Turning it on forces the menu-bar item back on (§8.7).
+    var hideDockIcon: Bool {
+        didSet {
+            defaults.set(hideDockIcon, forKey: Keys.hideDockIcon)
+            if hideDockIcon && hideMenuBarItem { hideMenuBarItem = false }
+        }
+    }
+
+    /// Ignored while the Dock icon is hidden — at least one entry point stays visible (§8.7).
+    var hideMenuBarItem: Bool {
+        didSet {
+            if hideMenuBarItem && hideDockIcon { hideMenuBarItem = false; return }
+            defaults.set(hideMenuBarItem, forKey: Keys.hideMenuBarItem)
+        }
+    }
+
+    var menuBarItemVisible: Bool { hideDockIcon || !hideMenuBarItem }
 
     var hasCompletedOnboarding: Bool {
         didSet { defaults.set(hasCompletedOnboarding, forKey: Keys.hasCompletedOnboarding) }

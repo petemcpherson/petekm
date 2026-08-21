@@ -1,27 +1,16 @@
-//
-//  PeteKMApp.swift
-//  PeteKM
-//
-//  Created by Pete McPherson on 8/19/26.
-//
-//  No database: Markdown files on disk are the only canonical store
-//  (spec §2.2). Nothing here persists note content.
-//
-
 import SwiftUI
 
 @main
 struct PeteKMApp: App {
-    @State private var folderStore = FolderStore()
-    @State private var settings = AppSettings()
+    // The sticky window is created and owned by the delegate so it can outlive being closed (§8.7).
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
     var body: some Scene {
-        WindowGroup {
-            RootView()
-                .environment(folderStore)
-                .environment(settings)
+        Settings {
+            SettingsView()
+                .environment(AppServices.shared.folderStore)
+                .environment(AppServices.shared.settings)
         }
-        .windowResizability(.contentSize)
         .commands {
             CommandGroup(replacing: .newItem) { }
         }

@@ -43,6 +43,11 @@ struct DailyStickyView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             session.handleActivation()
         }
+        // Summoned by the global shortcut: recheck the date, then land the cursor where it was (§8.2, §8.3).
+        .onReceive(NotificationCenter.default.publisher(for: .peteKMDidSummon)) { _ in
+            session.handleActivation()
+            Task { @MainActor in editorController.focusEditor() }
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willResignActiveNotification)) { _ in
             session.flush()
         }
@@ -62,6 +67,12 @@ struct DailyStickyView: View {
                 .font(DS.Text.monoCaption)
                 .foregroundStyle(DS.Color.textTertiary)
             Spacer(minLength: 0)
+            Toggle(isOn: Binding(get: { settings.floatOnTop },
+                                 set: { settings.floatOnTop = $0 })) {
+                Image(systemName: settings.floatOnTop ? "pin.fill" : "pin")
+            }
+            .toggleStyle(.button)
+            .help("Float Above Other Apps")
             Toggle(isOn: Binding(get: { settings.showTableOfContents },
                                  set: { settings.showTableOfContents = $0 })) {
                 Image(systemName: "list.bullet")

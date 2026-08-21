@@ -177,12 +177,12 @@ struct OnboardingView: View {
             VStack(alignment: .leading, spacing: DS.Space.s3) {
                 Text("Global shortcut")
                     .font(DS.Text.uiLabel)
-                Text("PeteKM has no shortcut until you set one. \(AppSettings.suggestedShortcut) is a safe suggestion.")
+                Text("PeteKM has no shortcut until you set one. \(AppSettings.suggestedShortcut.displayString) is a safe suggestion.")
                     .font(DS.Text.callout)
                     .foregroundStyle(DS.Color.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: DS.Space.s4) {
-                    Button("Use \(AppSettings.suggestedShortcut)") {
+                    Button("Use \(AppSettings.suggestedShortcut.displayString)") {
                         model.settingsRef.globalShortcut = AppSettings.suggestedShortcut
                     }
                     .disabled(model.settingsRef.globalShortcut == AppSettings.suggestedShortcut)
@@ -191,8 +191,12 @@ struct OnboardingView: View {
                     }
                     .buttonStyle(.link)
                 }
+                ShortcutRecorder(combo: Binding(
+                    get: { model.settingsRef.globalShortcut },
+                    set: { model.settingsRef.globalShortcut = $0 }
+                ))
                 if let shortcut = model.settingsRef.globalShortcut {
-                    Text("Set to \(shortcut).")
+                    Text("Set to \(shortcut.displayString).")
                         .font(DS.Text.caption)
                         .foregroundStyle(DS.Color.textTertiary)
                 }
