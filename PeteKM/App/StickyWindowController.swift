@@ -4,6 +4,9 @@ import SwiftUI
 extension Notification.Name {
     /// Posted when the capture window is summoned — the editor refocuses and rechecks the date (§8.2, §7.7).
     static let peteKMDidSummon = Notification.Name("petekm.didSummon")
+
+    /// Posted by the menu bar's **Search All PeteKM…** — opens the palette in search mode (§10.2).
+    static let peteKMOpenSearch = Notification.Name("petekm.openSearch")
 }
 
 /// Owns the single sticky capture window: it hides rather than closes, and remembers where it was (§8.6, §8.7).

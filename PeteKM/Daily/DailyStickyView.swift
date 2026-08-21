@@ -10,6 +10,8 @@ struct DailyStickyView: View {
 
     @State private var session: DailySession?
     @State private var editorController = EditorController()
+    @State private var palette = PaletteModel()
+    @State private var keyMonitor: Any?
 
     var body: some View {
         Group {
@@ -39,7 +41,20 @@ struct DailyStickyView: View {
                 }
             }
         }
+        .overlay {
+            if palette.isPresented {
+                CommandPaletteView(model: palette)
+            }
+        }
         .conflictAlert(document: session.document)
+        .onAppear {
+            palette.configure(folder: folder) { perform($0, session: session) }
+            installPaletteShortcut()
+        }
+        .onDisappear { removePaletteShortcut() }
+        .onReceive(NotificationCenter.default.publisher(for: .peteKMOpenSearch)) { _ in
+            palette.present(mode: .search)
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             session.handleActivation()
         }
@@ -57,6 +72,55 @@ struct DailyStickyView: View {
         .onDisappear { session.flush() }
     }
 
+    // MARK: - Palette
+
+    /// A local key monitor rather than a hidden button: ⌘K has to work while the
+    /// NSTextView owns first responder (§10.1).
+    private func installPaletteShortcut() {
+        guard keyMonitor == nil else { return }
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            guard event.modifierFlags.contains(.command),
+                  !event.modifierFlags.contains(.option),
+                  event.charactersIgnoringModifiers?.lowercased() == "k"
+            else { return event }
+
+            Task { @MainActor in
+                if palette.isPresented { palette.dismiss() } else { palette.present() }
+            }
+            return nil
+        }
+    }
+
+    private func removePaletteShortcut() {
+        if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
+        keyMonitor = nil
+    }
+
+    private func perform(_ outcome: PaletteOutcome, session: DailySession) {
+        switch outcome {
+        case .openToday:
+            session.openToday()
+
+        case .openDaily(let date):
+            session.open(date: date)
+
+        case .openFile(let url, let reveal):
+            session.open(fileURL: url, reveal: reveal)
+            if let reveal {
+                // The editor may have just been rebuilt for a different file; jump once it exists.
+                Task { @MainActor in editorController.reveal(reveal) }
+            }
+
+        case .revealFolderInFinder:
+            NSWorkspace.shared.activateFileViewerSelecting([folder.root])
+
+        case .openSettings:
+            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        }
+
+        editorController.focusEditor()
+    }
+
     private func header(_ session: DailySession) -> some View {
         HStack(spacing: DS.Space.s4) {
             PixelMark(size: 16)
@@ -67,6 +131,12 @@ struct DailyStickyView: View {
                 .font(DS.Text.monoCaption)
                 .foregroundStyle(DS.Color.textTertiary)
             Spacer(minLength: 0)
+            Button {
+                palette.present()
+            } label: {
+                Image(systemName: "magnifyingglass")
+            }
+            .help("Command Palette (⌘K)")
             Toggle(isOn: Binding(get: { settings.floatOnTop },
                                  set: { settings.floatOnTop = $0 })) {
                 Image(systemName: settings.floatOnTop ? "pin.fill" : "pin")
@@ -101,7 +171,10 @@ struct DailyStickyView: View {
                     }
                     Divider()
                 }
-                StickyTextEditor(document: document, settings: settings, controller: editorController)
+                StickyTextEditor(document: document,
+                                 settings: settings,
+                                 controller: editorController,
+                                 preferredSelection: session.revealRange)
                     .id(document.url)
             }
         } else {
@@ -117,12 +190,16 @@ private struct StickyTextEditor: View {
 
     private let cursors = CursorMemory()
 
-    init(document: StickyDocument, settings: AppSettings, controller: EditorController) {
+    init(document: StickyDocument,
+         settings: AppSettings,
+         controller: EditorController,
+         preferredSelection: NSRange? = nil) {
         _document = Bindable(document)
         self.settings = settings
         self.controller = controller
-        // Restored before the text view is built, so the caret lands where the user left it (§8.3).
-        controller.initialSelection = CursorMemory().selection(for: document.url)
+        // A search hit wins over the remembered caret; otherwise restore where the
+        // user left off before the text view is built (§8.3, §11.4).
+        controller.initialSelection = preferredSelection ?? CursorMemory().selection(for: document.url)
     }
 
     var body: some View {

@@ -81,11 +81,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateMenuBarActions() {
-        menuBar.onRevealFolder = services.folderStore.folder == nil ? nil : { [weak self] in self?.revealFolder() }
+        let hasFolder = services.folderStore.folder != nil
+        menuBar.onRevealFolder = hasFolder ? { [weak self] in self?.revealFolder() } : nil
+        menuBar.onSearch = hasFolder ? { [weak self] in self?.openSearch() } : nil
         menuBar.refresh()
     }
 
     // MARK: - Actions
+
+    private func openSearch() {
+        windowController?.summon()
+        NotificationCenter.default.post(name: .peteKMOpenSearch, object: nil)
+    }
 
     private func revealFolder() {
         guard let folder = services.folderStore.folder else { return }

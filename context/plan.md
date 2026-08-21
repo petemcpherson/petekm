@@ -8,7 +8,7 @@ Derived from `context/spec.md` (product behavior) and `context/DESIGN.md` (visua
 - [x] Phase 2 — Daily Sticky core: file model, autosave, external-edit safety
 - [x] Phase 3 — Markdown editor experience
 - [x] Phase 4 — App lifecycle: global shortcut, window character, menu bar
-- [ ] Phase 5 — Command palette & local search
+- [x] Phase 5 — Command palette & local search
 - [ ] Phase 6 — External tools: VS Code, Terminal, Finder, Git
 - [ ] Phase 7 — Settings, agent-file refresh, distribution & updates
 
@@ -127,7 +127,7 @@ Goal: the defining shortcut → type → hide loop, 30+ times a day (§4.1, §8)
 
 ---
 
-## Phase 5 — Command palette & local search
+## Phase 5 — Command palette & local search — [COMPLETED]
 
 Goal: keyboard-first gateway to everything beyond typing (§10), plus fast deterministic full-text search (§11).
 
