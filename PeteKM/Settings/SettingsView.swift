@@ -25,6 +25,8 @@ struct SettingsView: View {
                 .tabItem { Label("Folder", systemImage: "folder") }
             UpdateSettingsView()
                 .tabItem { Label("Updates", systemImage: "arrow.down.circle") }
+            GuideSettingsView()
+                .tabItem { Label("Guide", systemImage: "book") }
         }
         .frame(width: 460)
     }

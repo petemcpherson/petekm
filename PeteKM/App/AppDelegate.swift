@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let services = AppServices.shared
     private let menuBar = MenuBarController()
     private var windowController: StickyWindowController?
+    private var settingsKeyMonitor: Any?
 
     private var settings: AppSettings { services.settings }
 
@@ -28,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         observeSettings()
         observeFolder()
+        observeSettingsShortcut()
         UpdateController.shared.apply(settings: settings)
 
         controller.summon()
@@ -43,6 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         GlobalHotKeyMonitor.shared.unregister()
+        if let settingsKeyMonitor { NSEvent.removeMonitor(settingsKeyMonitor) }
     }
 
     // MARK: - Settings application
@@ -98,6 +101,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func revealFolder() {
         guard let folder = services.folderStore.folder else { return }
         NSWorkspace.shared.activateFileViewerSelecting([folder.root])
+    }
+
+    /// The Settings menu item carries ⌘. (PeteKMApp); ⌘, is kept alive here so the
+    /// standard macOS preferences key still works.
+    private func observeSettingsShortcut() {
+        settingsKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+                  event.charactersIgnoringModifiers == ","
+            else { return event }
+            self?.openSettings()
+            return nil
+        }
     }
 
     private func openSettings() {

@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **Start with `context/map.md`** — a short architecture map of the whole app: features, files/folders, data structures, and where to read further.
+
 ## What this repo is
 
 This repo is the **native macOS app** PeteKM (SwiftUI, Xcode project). It is *not* a PeteKM knowledge folder.
@@ -10,7 +12,7 @@ Do not confuse the two `CLAUDE.md` files:
 - **This file** — instructions for developing the Swift app.
 - The `CLAUDE.md` the app *generates inside a user's PeteKM folder* at onboarding — a template artifact shipped by the app, describing the `daily/` + `library/` safety contract for RoboPete. Editing that template is a product-content change, not a change to these instructions.
 
-Current state: the repo is still the stock Xcode SwiftUI+SwiftData template (`Item.swift`, list-based `ContentView`). None of the product exists yet. `context/spec.md` (product behavior) and `context/DESIGN.md` (visual/UX/vocabulary) are the source of truth for what to build.
+Current state: all 7 phases of `context/plan.md` are implemented; the template scaffolding and SwiftData are gone. `context/spec.md` (product behavior) and `context/DESIGN.md` (visual/UX/vocabulary) remain the source of truth for what to build; `context/map.md` maps what exists today.
 
 ## Build / test
 

@@ -13,6 +13,11 @@ struct PeteKMApp: App {
         }
         .commands {
             CommandGroup(replacing: .newItem) { }
+            // ⌘. opens Settings; ⌘, still works via the key monitor in AppDelegate.
+            CommandGroup(replacing: .appSettings) {
+                SettingsLink { Text("Settings…") }
+                    .keyboardShortcut(".", modifiers: .command)
+            }
             CommandGroup(after: .appInfo) {
                 Button("Check for Updates…") { UpdateController.shared.checkForUpdates() }
                     .disabled(!UpdateController.shared.canCheckForUpdates)
