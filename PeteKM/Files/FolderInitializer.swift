@@ -88,6 +88,31 @@ enum FolderInitializer {
         return report
     }
 
+    /// True when any agent file on disk differs from the shipped template, or is
+    /// missing — i.e. Refresh Agent Files would change something.
+    static func agentFilesAreOutOfDate(_ folder: PeteKMFolder) -> Bool {
+        var items: [(URL, String)] = [(folder.claudeMd, AgentTemplates.claudeMd),
+                                      (folder.agentsMd, AgentTemplates.agentsMd)]
+        for name in AgentTemplates.skillNames {
+            items.append((folder.skill(name), AgentTemplates.skill(name)))
+        }
+        return items.contains { url, contents in FileWriting.readText(url) != contents }
+    }
+
+    /// A stable fingerprint of the shipped templates. Changes only when the app
+    /// ships new agent content, so a notice keyed on it fires once per version.
+    static var agentTemplatesFingerprint: String {
+        let all = ([AgentTemplates.claudeMd, AgentTemplates.agentsMd]
+                   + AgentTemplates.skillNames.map(AgentTemplates.skill)).joined(separator: "\u{0}")
+        // FNV-1a: `hashValue` is per-process randomized and must not be persisted.
+        var hash: UInt64 = 0xcbf29ce484222325
+        for byte in all.utf8 {
+            hash ^= UInt64(byte)
+            hash = hash &* 0x100000001b3
+        }
+        return String(hash, radix: 16)
+    }
+
     /// Rewrite just the agent-file templates, backing up anything that differs
     /// (§6.5). `INDEX.md`, `INBOX.md`, and knowledge files are never touched.
     @discardableResult

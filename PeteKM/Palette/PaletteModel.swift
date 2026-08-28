@@ -276,7 +276,7 @@ final class PaletteModel {
                 PaletteRow(id: command.rawValue,
                            title: command.title,
                            subtitle: command.group,
-                           snippet: nil,
+                           snippet: command.explainer,
                            kind: .command(command))
             }
     }

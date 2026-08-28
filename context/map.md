@@ -15,7 +15,7 @@ real detail lives.
 | `context/plan.md` | 7-phase implementation plan. All phases complete. | ~210L |
 | `context/ACCEPTANCE.md` | Criterion → code → test mapping (spec §24, §22). Best "does X exist?" lookup. | ~100L |
 | `context/DISTRIBUTION.md` | Signing, notarization, Sparkle, `scripts/release.sh`. | ~57L |
-| `context/design-system/` | Tokens + RoboPete pixel-art assets (`robopete*.png/svg`, `robopete.grid.json`). | — |
+| `context/design-system/` | Tokens + pixel-art mark assets (`robopete*.png/svg`, `robopete.grid.json` — internal filenames only, no user-facing name). | — |
 
 ## Non-negotiable invariants
 
@@ -35,8 +35,8 @@ These have direct code consequences. Break one and the design breaks.
    Not WYSIWYG (§9.1–9.2). Rules out rich-text/AttributedString-hiding approaches.
 6. **Sandbox is OFF** (`ENABLE_APP_SANDBOX = NO`) because the app shells out to
    `git`/`code`/Terminal. Folder access still goes through a security-scoped bookmark.
-7. **Vocabulary is fixed** (DESIGN §2): *Daily Sticky*, *Library*, *RoboPete*, *PeteKM*.
-   Copy is terse and plain — "RoboPete filed 4 things." No streaks, no motivation.
+7. **Vocabulary is fixed** (DESIGN §2): *Daily Sticky*, *Library*, *PeteKM* (no separate
+   agent persona name). Copy is terse and plain — "Nothing found." No streaks, no motivation.
 
 ## Build / test
 
@@ -180,8 +180,9 @@ Custom `NSTextView`, not `TextEditor`. Syntax markers stay on screen.
 ## Design system (`PeteKM/DesignSystem/`)
 
 `DS.swift` — `DS.Color` (light/dark dynamic pairs), `DS.Font` (system faces, 10–28pt),
-spacing/radius tokens. `PixelMark.swift` — RoboPete pixel-art mark + wordmark, the only
-custom branding (DESIGN §3, §6). Prefer native controls over custom chrome.
+spacing/radius tokens. `PixelMark.swift` — pixel-art mark + wordmark (asset files
+internally named `robopete*`), the only custom branding (DESIGN §3, §6). Prefer native
+controls over custom chrome.
 
 ---
 

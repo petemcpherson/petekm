@@ -26,8 +26,24 @@ enum AgentTemplates {
     static let index = """
     # Library Index
 
-    The Library is empty so far. This index is maintained by the filing skills;
-    run /petekm-rebuild-index to regenerate it at any time.
+    Maintained by the filing skills. Run /petekm-rebuild-index to repair it at any
+    time. Three sections: Placement guide and Areas are short and always read;
+    Files is searched, never read whole.
+
+    ## Placement guide
+
+    - Running lists (movies, books, restaurants, gift ideas) → `library/Lists/`
+    - Work topics, projects, decisions → `library/Work/`
+    - People, companies, products → `library/Reference/`
+    - Unsure → `INBOX.md`
+
+    ## Areas
+
+    The Library is empty so far.
+
+    ## Files
+
+    None yet.
     """
 
     // MARK: - .gitignore (§6.2)
@@ -91,9 +107,10 @@ enum AgentTemplates {
 
     ## Working at scale
 
-    This folder may hold thousands of files. Do not load it wholesale. Read
-    `INDEX.md`, search filenames, headings, and full text with ordinary filesystem
-    tools, then open only the files and line ranges you actually need.
+    This folder may hold thousands of files. Do not load it wholesale. Read the
+    Placement guide and Areas sections of `INDEX.md`; grep its Files section rather
+    than reading it. Search filenames, headings, and full text with ordinary
+    filesystem tools, then open only the files and line ranges you actually need.
     """
 
     // MARK: - AGENTS.md (§5.6, §13)
@@ -197,6 +214,10 @@ enum AgentTemplates {
 
     Create a new file only when it draws a genuinely useful durable boundary.
 
+    Consult the Placement guide in `INDEX.md` before choosing a folder. If no rule
+    fits and you create a new file anyway, add a one-line rule so the next run
+    files the same kind of item the same way.
+
     ## 7. Human edits win
 
     The user edits Library files directly, in any tool. The on-disk version is always
@@ -222,9 +243,18 @@ enum AgentTemplates {
 
     ## 10. INDEX.md
 
-    `INDEX.md` is a map, not a summary store. Concise descriptions and paths, grouped
-    by area. It does not list Daily Stickies. Update it when the Library's structure
-    changes; rebuild it from the Library filesystem when it drifts.
+    `INDEX.md` is a map, not a summary store. It does not list Daily Stickies. Three
+    sections:
+
+    - **Placement guide** — where each kind of item goes. Short. User-editable.
+    - **Areas** — one line per top-level Library folder: path, description, file
+      count. Always read in full.
+    - **Files** — one line per Library file, grouped by folder. Grep it; never read
+      it whole once the Library is large.
+
+    The filesystem is the truth and the index is a cache of it. If any Files path no
+    longer resolves, or a Library file is newer than `INDEX.md`, the index is stale:
+    repair it (`/petekm-rebuild-index`, incremental) before relying on it.
 
     ## 11. INBOX.md
 
@@ -265,9 +295,10 @@ enum AgentTemplates {
 
     ## 14. Working at scale
 
-    Assume this folder is large. Read `CLAUDE.md`, consult `INDEX.md`, search
-    filenames, headings, and full text, then open only what you need. Never load the
-    whole folder into context.
+    Assume this folder is large. Read `CLAUDE.md`, then the Placement guide and
+    Areas of `INDEX.md`; grep the Files section. Search filenames, headings, and full
+    text, then open only what you need. Never load the whole folder or the whole
+    Files section into context.
     """
 
     // MARK: - Skills (§14.2)
@@ -298,19 +329,25 @@ enum AgentTemplates {
     1. Determine today's local date and open `daily/YYYY-MM-DD.md`. If it does not
        exist, say so and stop — do not create it.
     2. Read the Daily Sticky in full. Do not modify it in any way.
-    3. Read `INDEX.md` to learn the Library's current shape.
-    4. For each item worth keeping (`AGENTS.md` §3), search the Library for an
-       existing destination before creating anything new.
-    5. Update or create Library files conservatively. Preserve uncertainty (§4) and
+    3. Check `INDEX.md` freshness: if any path in its Files section no longer
+       exists, or `find library -name '*.md' -newer INDEX.md` prints anything,
+       run the incremental repair from `/petekm-rebuild-index` first.
+    4. Read the Placement guide and Areas sections of `INDEX.md`. Grep the Files
+       section as needed; do not read it whole.
+    5. For each item worth keeping (`AGENTS.md` §3), search the Library for an
+       existing destination before creating anything new. Follow the Placement
+       guide for new files; add a rule when none fits.
+    6. Update or create Library files conservatively. Preserve uncertainty (§4) and
        record provenance back to the source Daily Sticky (§5).
-    6. Anything you cannot confidently place goes to `INBOX.md` as a copy, with its
+    7. Anything you cannot confidently place goes to `INBOX.md` as a copy, with its
        source date and a one-line reason (§11).
-    7. If `INBOX.md` already holds items, try to file them too, and remove the ones
+    8. If `INBOX.md` already holds items, try to file them too, and remove the ones
        you successfully filed.
-    8. Update `INDEX.md` only if the Library's structure materially changed.
-    9. On success, update `.petekm-state.json` with `lastSuccessfulProcessing` (ISO
-       8601, local offset) and `lastProcessedDailyNote`.
-    10. Report: files created, files updated, items skipped, and the count sent to
+    9. Add a Files line for every file you created, and update Areas counts or
+       the Placement guide if they changed. Do not rewrite the rest of the index.
+    10. On success, update `.petekm-state.json` with `lastSuccessfulProcessing` (ISO
+        8601, local offset) and `lastProcessedDailyNote`.
+    11. Report: files created, files updated, items skipped, and the count sent to
         `INBOX.md`.
 
     ## Never
@@ -335,7 +372,7 @@ enum AgentTemplates {
     1. Resolve the argument to a daily file: accept `2026-08-19`, `2026-08-19.md`,
        `daily/2026-08-19.md`, or a plain-language date. If it is ambiguous, ask.
     2. If the file does not exist, list nearby existing Daily Stickies and stop.
-    3. Read `AGENTS.md`, then follow `/petekm-process-today` steps 2–8 against that
+    3. Read `AGENTS.md`, then follow `/petekm-process-today` steps 2–9 against that
        file.
     4. Update `.petekm-state.json` only if this run processed a note **newer** than
        the recorded `lastProcessedDailyNote`; back-filling an older day must not make
@@ -357,28 +394,51 @@ enum AgentTemplates {
     The Library filesystem is the source of truth for this operation. Do **not** read
     Daily Stickies to build the index.
 
+    Default mode is **incremental**: keep what is still correct, fix what drifted.
+    Do a full rewrite only when the user asks for one or the index is missing or
+    unparseable.
+
     ## Steps
 
     1. Walk `library/` and collect every `.md` file with its path.
-    2. For each file, read enough to write one accurate line — usually the title and
-       first section, not the whole file.
-    3. Group entries by top-level Library folder, in a stable order.
-    4. Write `INDEX.md`:
+    2. Compare against the current Files section:
+       - path in index, file gone → drop the line;
+       - file on disk, not in index (new, renamed, or moved) → describe it;
+       - file newer than `INDEX.md` → re-check that its line is still accurate;
+       - everything else → keep the existing line verbatim, including any wording
+         the user edited.
+    3. For each file that needs a description, read enough to write one accurate
+       line — usually the title and first section, not the whole file.
+    4. Regenerate Areas from the folders on disk: one line per top-level folder
+       with path, description, and file count. Keep existing descriptions where the
+       folder still exists.
+    5. Keep the Placement guide as is. Only add a rule if a folder exists that no
+       rule mentions; never delete a rule the user wrote.
+    6. Write `INDEX.md`:
 
        ```md
        # Library Index
 
-       Last updated: YYYY-MM-DD
+       Last rebuilt: YYYY-MM-DD
 
-       ## Work
+       ## Placement guide
+
+       - Running lists (movies, books, restaurants, gift ideas) → `library/Lists/`
+
+       ## Areas
+
+       - `library/Work/` — job topics, projects, decisions (140 files)
+
+       ## Files
+
+       ### library/Work
 
        - `library/Work/MFT.md` — Managed file transfer concepts, terminology, protocols, and authentication.
        ```
 
-    5. Keep descriptions to one line. The index is a map, not a summary store, and
-       never lists Daily Stickies.
-    6. Report how many files were indexed and any path in the old index that no
-       longer resolves.
+    7. Descriptions stay on one line. The index is a map, not a summary store, and
+       never lists Daily Stickies. Files are grouped by folder in a stable order.
+    8. Report: files added, removed, re-described, and kept.
 
     If the Library is empty, restore the placeholder text rather than writing an
     empty file.
@@ -413,7 +473,8 @@ enum AgentTemplates {
        - merging preserves both sources' content and provenance lines;
        - renames and moves keep the file's history-worthy content intact;
        - nothing in `daily/` moves, ever.
-    5. Rebuild `INDEX.md` to match the new structure.
+    5. Rebuild `INDEX.md` to match the new structure, including Areas and any
+       Placement guide rules that pointed at moved folders.
     6. Report every change as a before → after list.
 
     Prefer the smaller reorganization. A Library that is slightly untidy is better
@@ -438,8 +499,8 @@ enum AgentTemplates {
        disposable, and its absence only means state was lost, not that filing failed).
     2. Daily Stickies newer than `lastProcessedDailyNote`, listed oldest-first.
     3. Library size: file count, and count per top-level folder.
-    4. Whether `INDEX.md` looks stale — modification time older than the newest
-       Library file, or paths that no longer resolve.
+    4. Whether `INDEX.md` looks stale — any Library file newer than it, any Files
+       path that no longer resolves, or any top-level folder missing from Areas.
     5. `INBOX.md`: item count, or "Nothing in Inbox."
     6. If the folder is a Git repository, whether the working tree is clean.
 

@@ -138,6 +138,29 @@ struct AgentTemplateTests {
         #expect(AgentTemplates.agentsMd.contains("INBOX.md"))
     }
 
+    @Test func indexIsTieredAndSelfHealing() {
+        for section in ["## Placement guide", "## Areas", "## Files"] {
+            #expect(AgentTemplates.index.contains(section))
+        }
+        #expect(AgentTemplates.index.contains("library/Lists/"))
+        #expect(AgentTemplates.skill("petekm-process-today").contains("freshness"))
+        #expect(AgentTemplates.skill("petekm-rebuild-index").contains("incremental"))
+        #expect(AgentTemplates.agentsMd.contains("Placement guide"))
+    }
+
+    @Test func detectsOutOfDateAgentFiles() throws {
+        let folder = try makeTemporaryFolder()
+        defer { remove(folder) }
+
+        _ = try FolderInitializer.initialize(folder)
+        #expect(!FolderInitializer.agentFilesAreOutOfDate(folder))
+        try FileWriting.writeAtomically("# edited", to: folder.agentsMd)
+        #expect(FolderInitializer.agentFilesAreOutOfDate(folder))
+        _ = try FolderInitializer.refreshAgentFiles(folder)
+        #expect(!FolderInitializer.agentFilesAreOutOfDate(folder))
+        #expect(FolderInitializer.agentTemplatesFingerprint == FolderInitializer.agentTemplatesFingerprint)
+    }
+
     @Test func gitignoreIgnoresOnlyDisposableState() {
         #expect(AgentTemplates.gitignore.contains(".petekm-state.json"))
         #expect(AgentTemplates.gitignore.contains(".DS_Store"))

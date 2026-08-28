@@ -47,6 +47,8 @@ final class AppSettings {
         static let showDateHeading = "petekm.showDateHeading"
         static let globalShortcut = "petekm.globalShortcut"
         static let hasCompletedOnboarding = "petekm.hasCompletedOnboarding"
+        /// Template fingerprint the "agent files out of date" notice was last shown for (§6.5).
+        static let agentFilesNoticeShownFor = "petekm.agentFilesNoticeShownFor"
         static let editorFontName = "petekm.editorFontName"
         static let editorFontSize = "petekm.editorFontSize"
         static let editorLineSpacing = "petekm.editorLineSpacing"
@@ -72,6 +74,7 @@ final class AppSettings {
         showDateHeading = defaults.object(forKey: Keys.showDateHeading) as? Bool ?? true
         globalShortcut = defaults.string(forKey: Keys.globalShortcut).flatMap(KeyCombo.init(storageValue:))
         hasCompletedOnboarding = defaults.bool(forKey: Keys.hasCompletedOnboarding)
+        agentFilesNoticeShownFor = defaults.string(forKey: Keys.agentFilesNoticeShownFor)
         editorFontName = defaults.string(forKey: Keys.editorFontName)
         editorFontSize = defaults.object(forKey: Keys.editorFontSize) as? Double ?? 13
         automaticUpdateChecks = defaults.object(forKey: Keys.automaticUpdateChecks) as? Bool ?? true
@@ -128,6 +131,11 @@ final class AppSettings {
 
     var hasCompletedOnboarding: Bool {
         didSet { defaults.set(hasCompletedOnboarding, forKey: Keys.hasCompletedOnboarding) }
+    }
+
+    /// Template fingerprint the "agent files out of date" notice was last shown for (§6.5).
+    var agentFilesNoticeShownFor: String? {
+        didSet { defaults.set(agentFilesNoticeShownFor, forKey: Keys.agentFilesNoticeShownFor) }
     }
 
     // MARK: - Editor (§18.6)

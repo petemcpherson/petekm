@@ -53,6 +53,7 @@ struct DailyStickyView: View {
         .onAppear {
             palette.configure(folder: folder) { perform($0, session: session) }
             installPaletteShortcut()
+            noticeIfAgentFilesOutOfDate()
         }
         .onDisappear {
             removePaletteShortcut()
@@ -167,11 +168,29 @@ struct DailyStickyView: View {
         }
     }
 
-    private func show(_ text: String) {
+    /// Once per shipped template version: if the folder's agent files differ from
+    /// what this build ships, say so and point at the fix (§6.5). Never blocks,
+    /// never repeats for the same version — a user who edited AGENTS.md on purpose
+    /// sees this once and not again until the app ships new content.
+    private func noticeIfAgentFilesOutOfDate() {
+        let fingerprint = FolderInitializer.agentTemplatesFingerprint
+        guard settings.agentFilesNoticeShownFor != fingerprint else { return }
+        let folder = folder
+        Task {
+            let outOfDate = await Task.detached(priority: .utility) {
+                FolderInitializer.agentFilesAreOutOfDate(folder)
+            }.value
+            guard outOfDate else { return }
+            settings.agentFilesNoticeShownFor = fingerprint
+            show("Agent files are out of date. Settings → Folder → Refresh Agent Files.", seconds: 15)
+        }
+    }
+
+    private func show(_ text: String, seconds: Double = 6) {
         noticeTask?.cancel()
         notice = text
         noticeTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(6))
+            try? await Task.sleep(for: .seconds(seconds))
             guard !Task.isCancelled else { return }
             notice = nil
         }

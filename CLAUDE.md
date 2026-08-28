@@ -10,7 +10,7 @@ This repo is the **native macOS app** PeteKM (SwiftUI, Xcode project). It is *no
 
 Do not confuse the two `CLAUDE.md` files:
 - **This file** — instructions for developing the Swift app.
-- The `CLAUDE.md` the app *generates inside a user's PeteKM folder* at onboarding — a template artifact shipped by the app, describing the `daily/` + `library/` safety contract for RoboPete. Editing that template is a product-content change, not a change to these instructions.
+- The `CLAUDE.md` the app *generates inside a user's PeteKM folder* at onboarding — a template artifact shipped by the app, describing the `daily/` + `library/` safety contract for the agent. Editing that template is a product-content change, not a change to these instructions.
 
 Current state: all 7 phases of `context/plan.md` are implemented; the template scaffolding and SwiftData are gone. `context/spec.md` (product behavior) and `context/DESIGN.md` (visual/UX/vocabulary) remain the source of truth for what to build; `context/map.md` maps what exists today.
 
@@ -43,10 +43,10 @@ These are non-negotiable product rules with direct code consequences. Read the r
 
 ## Key file/folder shapes the app generates
 
-A PeteKM folder the app initializes (`spec.md` §5): `daily/YYYY-MM-DD.md`, `library/**.md`, `.claude/skills/robopete-*/SKILL.md`, `ROBOPETE.md`, `INDEX.md`, `CLAUDE.md`, `AGENTS.md`, `.robopete-state.json`, `.gitignore`. Onboarding must never silently overwrite any of these if they already exist (§19.2).
+A PeteKM folder the app initializes (`spec.md` §5): `daily/YYYY-MM-DD.md`, `library/**.md`, `.claude/skills/petekm-*/SKILL.md`, `INDEX.md`, `CLAUDE.md`, `AGENTS.md`, `INBOX.md`, `.petekm-state.json`, `.gitignore`. Onboarding must never silently overwrite any of these if they already exist (§19.2).
 
 ## Vocabulary (user-facing strings)
 
-`DESIGN.md` §2 fixes the terminology and it should be used exactly in UI, commands, and menus: **Daily Sticky** (not journal/entry/page), **Library** (not vault/knowledge base), **RoboPete** (not "AI Assistant"), **PeteKM** with no qualifier. Copy tone: terse and plain — "RoboPete filed 4 things.", "Nothing found." No streaks, no motivational or productivity-guru phrasing (`DESIGN.md` §39).
+`DESIGN.md` §2 fixes the terminology and it should be used exactly in UI, commands, and menus: **Daily Sticky** (not journal/entry/page), **Library** (not vault/knowledge base), **PeteKM** with no qualifier (also the agent — no separate persona name exists). Copy tone: terse and plain — "Nothing found." No streaks, no motivational or productivity-guru phrasing (`DESIGN.md` §39).
 
-Visual direction: default macOS look, near-zero branding; the only custom asset is RoboPete as 1980s-Mac pixel art (`DESIGN.md` §3, §6). Prefer native controls over a custom design system.
+Visual direction: default macOS look, near-zero branding; the only custom asset is a 1980s-Mac pixel-art mark, internally named RoboPete in asset filenames (`DESIGN.md` §3, §6). Prefer native controls over a custom design system.
