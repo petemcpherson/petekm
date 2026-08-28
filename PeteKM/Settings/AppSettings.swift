@@ -7,8 +7,36 @@
 //  onboarding needs to record.
 //
 
+import AppKit
 import Foundation
 import Observation
+
+/// Parses user-typed hex colors: `#333`, `333333`, `#FF3030`, `#FF3030CC`.
+enum HexColor {
+
+    /// Returns `#RRGGBB` / `#RRGGBBAA` uppercase, or `nil` if the input is not a hex color.
+    static func normalize(_ input: String) -> String? {
+        var s = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        if s.hasPrefix("#") { s.removeFirst() }
+        guard !s.isEmpty, s.allSatisfy(\.isHexDigit) else { return nil }
+        switch s.count {
+        case 3, 4: s = s.map { "\($0)\($0)" }.joined()
+        case 6, 8: break
+        default: return nil
+        }
+        return "#" + s.uppercased()
+    }
+
+    static func color(_ input: String) -> NSColor? {
+        guard let hex = normalize(input) else { return nil }
+        let digits = Array(hex.dropFirst())
+        func byte(_ i: Int) -> CGFloat {
+            CGFloat(Int(String(digits[i..<i + 2]), radix: 16) ?? 0) / 255
+        }
+        let alpha: CGFloat = digits.count == 8 ? byte(6) : 1
+        return NSColor(srgbRed: byte(0), green: byte(2), blue: byte(4), alpha: alpha)
+    }
+}
 
 /// How a new day's Daily Sticky starts (§7.2).
 enum DailyStartBehavior: String, CaseIterable, Identifiable, Sendable {
@@ -59,7 +87,13 @@ final class AppSettings {
         static let hideDockIcon = "petekm.hideDockIcon"
         static let hideMenuBarItem = "petekm.hideMenuBarItem"
         static let automaticUpdateChecks = "petekm.automaticUpdateChecks"
+        static let backgroundHex = "petekm.backgroundHex"
+        static let backgroundOpacity = "petekm.backgroundOpacity"
+        static let textHex = "petekm.textHex"
     }
+
+    /// Opacity floor: the window must stay findable.
+    static let backgroundOpacityRange: ClosedRange<Double> = 0.1...1.0
 
     static let suggestedShortcut = KeyCombo.suggested
 
@@ -85,7 +119,56 @@ final class AppSettings {
         floatOnTop = defaults.object(forKey: Keys.floatOnTop) as? Bool ?? false
         hideDockIcon = defaults.object(forKey: Keys.hideDockIcon) as? Bool ?? false
         hideMenuBarItem = defaults.object(forKey: Keys.hideMenuBarItem) as? Bool ?? false
+        _backgroundHex = defaults.string(forKey: Keys.backgroundHex).flatMap(HexColor.normalize)
+        _textHex = defaults.string(forKey: Keys.textHex).flatMap(HexColor.normalize)
+        _backgroundOpacity = AppSettings.clampOpacity(
+            defaults.object(forKey: Keys.backgroundOpacity) as? Double ?? 1
+        )
         if hideDockIcon { hideMenuBarItem = false }   // §8.7: both entry points may not be hidden
+    }
+
+    // MARK: - Window background
+
+    /// Normalized `#RRGGBB` (or `#RRGGBBAA`). `nil` means the default window surface.
+    /// Invalid input is dropped, not stored.
+    var backgroundHex: String? {
+        get { _backgroundHex }
+        set {
+            _backgroundHex = newValue.flatMap(HexColor.normalize)
+            defaults.set(_backgroundHex, forKey: Keys.backgroundHex)
+        }
+    }
+    private var _backgroundHex: String?
+
+    /// Editor text color as `#RRGGBB`. `nil` means the system label color.
+    var textHex: String? {
+        get { _textHex }
+        set {
+            _textHex = newValue.flatMap(HexColor.normalize)
+            defaults.set(_textHex, forKey: Keys.textHex)
+        }
+    }
+    private var _textHex: String?
+
+    var textColor: NSColor? { textHex.flatMap(HexColor.color) }
+
+    /// 0.1…1.0; 1 is fully opaque. Out-of-range values are clamped.
+    var backgroundOpacity: Double {
+        get { _backgroundOpacity }
+        set {
+            _backgroundOpacity = AppSettings.clampOpacity(newValue)
+            defaults.set(_backgroundOpacity, forKey: Keys.backgroundOpacity)
+        }
+    }
+    private var _backgroundOpacity: Double
+
+    /// Custom background color, if one is set. Opacity is applied by the caller.
+    var backgroundColor: NSColor? {
+        backgroundHex.flatMap(HexColor.color)
+    }
+
+    private static func clampOpacity(_ value: Double) -> Double {
+        min(max(value, backgroundOpacityRange.lowerBound), backgroundOpacityRange.upperBound)
     }
 
     var dailyStartBehavior: DailyStartBehavior {
@@ -174,7 +257,8 @@ final class AppSettings {
     var editorStyle: MarkdownStyle {
         MarkdownStyle(fontSize: CGFloat(editorFontSize),
                       lineSpacing: CGFloat(editorLineSpacing),
-                      fontName: editorFontName)
+                      fontName: editorFontName,
+                      textColor: textColor)
     }
 
     /// Font sizes offered in Settings — a short list beats a stepper here.

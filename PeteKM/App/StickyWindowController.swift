@@ -32,6 +32,10 @@ final class StickyWindowController: NSObject, NSWindowDelegate {
         window.isMovableByWindowBackground = true
         window.isReleasedWhenClosed = false
         window.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
+        // The content view paints the background (color + opacity settings); the window stays clear.
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.hasShadow = true
         window.contentView = NSHostingView(rootView: content)
         window.delegate = self
 

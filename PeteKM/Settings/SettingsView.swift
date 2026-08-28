@@ -154,6 +154,24 @@ struct EditorSettingsView: View {
                 } maximumValueLabel: {
                     Text("12")
                 }
+
+                HexColorField(label: "Text color", placeholder: "#1A1A1A", hex: $settings.textHex)
+            }
+
+            Section("Background") {
+                HexColorField(label: "Color", placeholder: "#333333", hex: $settings.backgroundHex)
+
+                Slider(value: $settings.backgroundOpacity,
+                       in: AppSettings.backgroundOpacityRange, step: 0.05) {
+                    Text("Opacity")
+                } minimumValueLabel: {
+                    Text("10%")
+                } maximumValueLabel: {
+                    Text("100%")
+                }
+                Text("\(Int((settings.backgroundOpacity * 100).rounded()))% opaque. Text stays solid.")
+                    .font(DS.Text.caption)
+                    .foregroundStyle(DS.Color.textSecondary)
             }
 
             Section("Behavior") {
@@ -167,6 +185,50 @@ struct EditorSettingsView: View {
         }
         .formStyle(.grouped)
         .settingsPane()
+    }
+}
+
+/// Hex text field with swatch + Reset. Return applies; empty or invalid input never clobbers the stored value.
+private struct HexColorField: View {
+    let label: String
+    let placeholder: String
+    @Binding var hex: String?
+    @State private var draft = ""
+
+    private var hint: String {
+        if draft.isEmpty { return "Hex like \(placeholder). Empty uses the system color." }
+        if HexColor.normalize(draft) == nil { return "Not a hex color." }
+        return "Press Return to apply."
+    }
+
+    private func commit() {
+        let trimmed = draft.trimmingCharacters(in: .whitespaces)
+        if trimmed.isEmpty {
+            hex = nil
+        } else if let normalized = HexColor.normalize(trimmed) {
+            hex = normalized
+            draft = normalized
+        }
+    }
+
+    var body: some View {
+        HStack {
+            TextField(label, text: $draft, prompt: Text(placeholder))
+                .onSubmit(commit)
+            if let hex, let color = HexColor.color(hex) {
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(Color(color))
+                    .frame(width: 18, height: 18)
+                    .overlay(RoundedRectangle(cornerRadius: 3).stroke(.separator))
+            }
+            if hex != nil {
+                Button("Reset") { hex = nil; draft = "" }
+            }
+        }
+        Text(hint)
+            .font(DS.Text.caption)
+            .foregroundStyle(DS.Color.textSecondary)
+            .onAppear { draft = hex ?? "" }
     }
 }
 

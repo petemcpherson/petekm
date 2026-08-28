@@ -83,7 +83,8 @@ struct MarkdownEditor: NSViewRepresentable {
         textView.textContainer?.widthTracksTextView = true
         textView.drawsBackground = false
         textView.font = style.body
-        textView.typingAttributes = [.font: style.body, .foregroundColor: NSColor.labelColor]
+        textView.typingAttributes = [.font: style.body, .foregroundColor: style.primaryColor]
+        textView.insertionPointColor = style.primaryColor
 
         return textView
     }
@@ -97,6 +98,8 @@ struct MarkdownEditor: NSViewRepresentable {
 
         if context.coordinator.style != style {
             context.coordinator.style = style
+            textView.typingAttributes = [.font: style.body, .foregroundColor: style.primaryColor]
+            textView.insertionPointColor = style.primaryColor
             context.coordinator.highlight(textView.textStorage)
         }
 

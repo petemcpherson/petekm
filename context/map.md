@@ -165,7 +165,7 @@ Custom `NSTextView`, not `TextEditor`. Syntax markers stay on screen.
 
 | File | Role |
 | --- | --- |
-| `AppSettings.swift` | `@Observable`, `UserDefaults`-backed. Keys are namespaced `petekm.*`: `dailyStartBehavior`, `defaultHeaders`, `showDateHeading`, `globalShortcut`, `hasCompletedOnboarding`, `editorFontName/Size/LineSpacing`, `showTableOfContents`, `autoClosePairs`, `continueListMarkers`, `floatOnTop`, `hideDockIcon`, `hideMenuBarItem`, `automaticUpdateChecks`. **No AI settings exist, now or later (§18.8).** |
+| `AppSettings.swift` | `@Observable`, `UserDefaults`-backed. Keys are namespaced `petekm.*`: `dailyStartBehavior`, `defaultHeaders`, `showDateHeading`, `globalShortcut`, `hasCompletedOnboarding`, `editorFontName/Size/LineSpacing`, `showTableOfContents`, `autoClosePairs`, `continueListMarkers`, `floatOnTop`, `hideDockIcon`, `hideMenuBarItem`, `automaticUpdateChecks`, `backgroundHex`, `backgroundOpacity`, `textHex` (window color/transparency + editor text color, all in the Editor tab; `HexColor` parser lives here; window is non-opaque, `DailyStickyView` paints the background). **No AI settings exist, now or later (§18.8).** |
 | `SettingsView.swift` | Tabs: General, Daily Sticky, Editor (+ Folder, Guide, Updates panes). |
 | `FolderSettingsView.swift` | Change folder, Refresh Agent Files, Git init/status. |
 | `GuideSettingsView.swift` | In-app explanation of the daily/library contract. |

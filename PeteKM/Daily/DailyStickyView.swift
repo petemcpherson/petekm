@@ -26,7 +26,13 @@ struct DailyStickyView: View {
             }
         }
         .frame(minWidth: 460, minHeight: 320)
-        .background(DS.Color.surfaceWindow)
+        .background(windowBackground)
+    }
+
+    /// Background color and transparency settings. Text stays fully opaque either way.
+    private var windowBackground: some View {
+        let base: Color = settings.backgroundColor.map(Color.init) ?? DS.Color.surfaceWindow
+        return base.opacity(settings.backgroundOpacity).ignoresSafeArea()
     }
 
     @ViewBuilder
@@ -294,7 +300,6 @@ private struct StickyTextEditor: View {
             controller: controller,
             onSelectionChange: { cursors.remember($0, for: document.url) }
         )
-        .background(DS.Color.surfaceWindow)
     }
 }
 

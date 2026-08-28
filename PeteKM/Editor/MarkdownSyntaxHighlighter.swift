@@ -6,8 +6,15 @@ struct MarkdownStyle: Equatable {
     var lineSpacing: CGFloat = 4
     /// Font family name for the editor, or `nil` for the system font (§18.6).
     var fontName: String?
+    /// Body text color, or `nil` for the system label color.
+    var textColor: NSColor?
 
     static let `default` = MarkdownStyle()
+
+    var primaryColor: NSColor { textColor ?? .labelColor }
+    /// Markers and quotes: dimmed from the chosen text color so a custom color keeps its tint.
+    var secondaryColor: NSColor { textColor?.withAlphaComponent(0.55) ?? .secondaryLabelColor }
+    var tertiaryColor: NSColor { textColor?.withAlphaComponent(0.3) ?? .tertiaryLabelColor }
 
     /// `#` ≈ 22, `##` ≈ 17, `###` ≈ 15, deeper ≈ body + 1.
     func headingSize(_ level: Int) -> CGFloat {
@@ -61,7 +68,7 @@ enum MarkdownSyntaxHighlighter {
 
         storage.setAttributes([
             .font: style.body,
-            .foregroundColor: NSColor.labelColor,
+            .foregroundColor: style.primaryColor,
             .paragraphStyle: paragraphStyle(style: style, indentLevels: 0, markerWidth: 0)
         ], range: full)
 
@@ -95,7 +102,7 @@ enum MarkdownSyntaxHighlighter {
         if let match = heading.firstMatch(in: line, range: lineOnly) {
             let level = match.range(at: 1).length
             storage.addAttribute(.font, value: style.heading(level), range: lineRange)
-            dim(storage, shift(match.range(at: 1), by: lineRange.location))
+            dim(storage, shift(match.range(at: 1), by: lineRange.location), style)
             return
         }
 
@@ -108,14 +115,14 @@ enum MarkdownSyntaxHighlighter {
                                                        markerWidth: markerWidth),
                                  range: lineRange)
             storage.addAttribute(.foregroundColor,
-                                 value: NSColor.secondaryLabelColor,
+                                 value: style.secondaryColor,
                                  range: shift(match.range(at: 2), by: lineRange.location))
             return
         }
 
         if let match = quote.firstMatch(in: line, range: lineOnly) {
-            storage.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: lineRange)
-            dim(storage, shift(match.range(at: 1), by: lineRange.location))
+            storage.addAttribute(.foregroundColor, value: style.secondaryColor, range: lineRange)
+            dim(storage, shift(match.range(at: 1), by: lineRange.location), style)
         }
     }
 
@@ -146,30 +153,30 @@ enum MarkdownSyntaxHighlighter {
         bold.enumerateMatches(in: line, range: lineOnly) { match, _, _ in
             guard let match else { return }
             addTrait(.boldFontMask, storage, shift(match.range, by: lineRange.location))
-            dim(storage, shift(match.range(at: 1), by: lineRange.location))
+            dim(storage, shift(match.range(at: 1), by: lineRange.location), style)
             dim(storage, shift(NSRange(location: match.range.upperBound - match.range(at: 1).length,
                                        length: match.range(at: 1).length),
-                               by: lineRange.location))
+                               by: lineRange.location), style)
         }
 
         italic.enumerateMatches(in: line, range: lineOnly) { match, _, _ in
             guard let match else { return }
             addTrait(.italicFontMask, storage, shift(match.range, by: lineRange.location))
-            dim(storage, shift(match.range(at: 1), by: lineRange.location))
-            dim(storage, shift(NSRange(location: match.range.upperBound - 1, length: 1), by: lineRange.location))
+            dim(storage, shift(match.range(at: 1), by: lineRange.location), style)
+            dim(storage, shift(NSRange(location: match.range.upperBound - 1, length: 1), by: lineRange.location), style)
         }
 
         code.enumerateMatches(in: line, range: lineOnly) { match, _, _ in
             guard let match else { return }
             let range = shift(match.range, by: lineRange.location)
             storage.addAttribute(.font, value: style.mono, range: range)
-            storage.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: range)
+            storage.addAttribute(.foregroundColor, value: style.secondaryColor, range: range)
         }
     }
 
     private static func styleCode(_ storage: NSTextStorage, _ range: NSRange, _ style: MarkdownStyle) {
         storage.addAttribute(.font, value: style.mono, range: range)
-        storage.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: range)
+        storage.addAttribute(.foregroundColor, value: style.secondaryColor, range: range)
     }
 
     /// Keeps whatever size/weight the block already assigned — a bold span inside an H2 stays H2-sized.
@@ -181,9 +188,9 @@ enum MarkdownSyntaxHighlighter {
         }
     }
 
-    private static func dim(_ storage: NSTextStorage, _ range: NSRange) {
+    private static func dim(_ storage: NSTextStorage, _ range: NSRange, _ style: MarkdownStyle) {
         guard range.length > 0 else { return }
-        storage.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor, range: range)
+        storage.addAttribute(.foregroundColor, value: style.tertiaryColor, range: range)
     }
 
     private static func shift(_ range: NSRange, by offset: Int) -> NSRange {

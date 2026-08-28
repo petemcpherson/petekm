@@ -59,6 +59,70 @@ private func freshDefaults() -> UserDefaults {
     #expect(reloaded.automaticUpdateChecks == false)
 }
 
+// MARK: - Window background
+
+@Test func backgroundDefaultsToSystemSurfaceAndFullyOpaque() {
+    let s = settings(in: freshDefaults())
+    #expect(s.backgroundHex == nil)
+    #expect(s.backgroundColor == nil)
+    #expect(s.backgroundOpacity == 1)
+}
+
+@Test func backgroundSettingsSurviveRelaunch() {
+    let defaults = freshDefaults()
+    let s = settings(in: defaults)
+    s.backgroundHex = "ff3030"
+    s.backgroundOpacity = 0.4
+
+    let reloaded = settings(in: defaults)
+    #expect(reloaded.backgroundHex == "#FF3030")
+    #expect(reloaded.backgroundOpacity == 0.4)
+}
+
+@Test func textColorPersistsAndReachesTheEditorStyle() {
+    let defaults = freshDefaults()
+    let s = settings(in: defaults)
+    #expect(s.textHex == nil)
+    #expect(s.editorStyle.textColor == nil)
+
+    s.textHex = "#ff3030"
+    let reloaded = settings(in: defaults)
+    #expect(reloaded.textHex == "#FF3030")
+    #expect(reloaded.editorStyle.textColor != nil)
+
+    s.textHex = "nope"
+    #expect(s.textHex == nil)
+}
+
+@Test func backgroundOpacityIsClampedToTenPercentMinimum() {
+    let s = settings(in: freshDefaults())
+    s.backgroundOpacity = 0
+    #expect(s.backgroundOpacity == 0.1)
+    s.backgroundOpacity = 3
+    #expect(s.backgroundOpacity == 1)
+}
+
+@Test func invalidHexIsRejectedAndKeepsDefaultSurface() {
+    let s = settings(in: freshDefaults())
+    s.backgroundHex = "#zzz"
+    #expect(s.backgroundHex == nil)
+    s.backgroundHex = "#12345"
+    #expect(s.backgroundHex == nil)
+}
+
+@Test func hexColorParsesCommonForms() {
+    #expect(HexColor.normalize("#333") == "#333333")
+    #expect(HexColor.normalize(" 333333 ") == "#333333")
+    #expect(HexColor.normalize("#ff3030cc") == "#FF3030CC")
+    #expect(HexColor.normalize("") == nil)
+
+    let c = HexColor.color("#FF3030")!.usingColorSpace(.sRGB)!
+    #expect(abs(c.redComponent - 1) < 0.01)
+    #expect(abs(c.greenComponent - 0x30 / 255.0) < 0.01)
+    #expect(abs(c.blueComponent - 0x30 / 255.0) < 0.01)
+    #expect(c.alphaComponent == 1)
+}
+
 @Test func clearingTheFontFallsBackToTheSystemFont() {
     let defaults = freshDefaults()
     let s = settings(in: defaults)
