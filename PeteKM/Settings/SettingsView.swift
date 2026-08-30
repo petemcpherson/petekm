@@ -100,6 +100,13 @@ struct DailyStickySettingsView: View {
                     .foregroundStyle(DS.Color.textSecondary)
             }
 
+            Section("Scratch") {
+                Toggle("Show the Scratch pane", isOn: $settings.scratchVisible)
+                Text("A pane under the editor holding the same text every day, no matter which file is open. Never filed into the Library, excluded from search, and in `.gitignore` so Git Sync can't commit it. Plain text on disk — not encrypted.")
+                    .font(DS.Text.caption)
+                    .foregroundStyle(DS.Color.textSecondary)
+            }
+
             Section("Default Headers") {
                 TextEditor(text: $settings.defaultHeaders)
                     .font(.system(.body, design: .monospaced))

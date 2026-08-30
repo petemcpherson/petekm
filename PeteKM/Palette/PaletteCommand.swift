@@ -13,6 +13,7 @@ enum PaletteCommandID: String, CaseIterable, Identifiable {
     case openDailySticky
     case openPreviousDailySticky
     case openDate
+    case openScratch
     case searchAllPeteKM
     case openLibraryFile
     case openLibraryIndex
@@ -32,6 +33,7 @@ enum PaletteCommandID: String, CaseIterable, Identifiable {
         case .openDailySticky: return "Open Daily Sticky"
         case .openPreviousDailySticky: return "Open Previous Daily Sticky"
         case .openDate: return "Open Date…"
+        case .openScratch: return "Open Scratch"
         case .searchAllPeteKM: return "Search All PeteKM…"
         case .openLibraryFile: return "Open Library File…"
         case .openLibraryIndex: return "Open Library Index"
@@ -57,6 +59,7 @@ enum PaletteCommandID: String, CaseIterable, Identifiable {
         case .openDailySticky: return "Jump back to today's capture."
         case .openPreviousDailySticky: return "Open the most recent earlier day."
         case .openDate: return "Open a past day by date, like 2026-08-19 or \"last friday\"."
+        case .openScratch: return "The pane under the editor. Carries over day to day; never filed, never committed."
         case .searchAllPeteKM: return "Full-text search across Daily Stickies and the Library."
         case .openLibraryFile: return "Open a Library file by name."
         case .openLibraryIndex: return "Open INDEX.md — the map of the Library and where things get filed."
@@ -73,7 +76,7 @@ enum PaletteCommandID: String, CaseIterable, Identifiable {
 
     var group: String {
         switch self {
-        case .openDailySticky, .openPreviousDailySticky, .openDate: return "Daily Sticky"
+        case .openDailySticky, .openPreviousDailySticky, .openDate, .openScratch: return "Daily Sticky"
         case .searchAllPeteKM, .openLibraryFile, .openLibraryIndex, .openLibraryInEditor: return "Library"
         case .openFolderInEditor, .openCurrentFileInEditor, .openTerminal, .revealFolderInFinder: return "External"
         case .reviewInbox, .gitSync, .settings: return "PeteKM"
@@ -85,6 +88,7 @@ enum PaletteCommandID: String, CaseIterable, Identifiable {
 enum PaletteOutcome: Equatable {
     case openToday
     case openDaily(Date)
+    case openScratch
     /// Any Markdown file in the folder, optionally with a range to jump to (§11.4, §30).
     case openFile(URL, reveal: NSRange?)
     case revealFolderInFinder

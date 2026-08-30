@@ -55,7 +55,12 @@ struct FolderInitializerTests {
 
         #expect(FileWriting.readText(folder.claudeMd) == mine)
         #expect(FileWriting.readText(folder.index) == "keep me")
-        #expect(FileWriting.readText(folder.gitignore) == "*.tmp")
+        // `.gitignore` is the one exception to "never touch it": the user's own lines are
+        // kept, and the Scratch exclusions are appended so private scratch text can't be
+        // committed by a folder that predates the feature.
+        let gitignore = try #require(FileWriting.readText(folder.gitignore))
+        #expect(gitignore.hasPrefix("*.tmp"))
+        #expect(gitignore.contains(PeteKMFolder.scratchFilename))
         #expect(report.kept.contains("CLAUDE.md"))
         #expect(report.kept.contains("INDEX.md"))
         #expect(report.backedUp.isEmpty)
@@ -87,7 +92,10 @@ struct FolderInitializerTests {
         // Knowledge files are outside the refresh's reach (§6.5).
         #expect(FileWriting.readText(folder.index) == "# my index\n")
 
-        let backups = try FileManager.default.contentsOfDirectory(atPath: folder.root.path(percentEncoded: false))
+        // Backups live in the hidden backups folder, never loose in the root (§6.5).
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.root.path(percentEncoded: false))
+            .allSatisfy { !$0.contains(".bak-") })
+        let backups = try FileManager.default.contentsOfDirectory(atPath: folder.backups.path(percentEncoded: false))
             .filter { $0.hasPrefix("AGENTS.md.bak-") }
         #expect(backups.count == 1)
     }
@@ -110,9 +118,9 @@ struct FolderInitializerTests {
 
         let day = Date(timeIntervalSince1970: 1_787_000_000)
         try FileWriting.writeAtomically("one", to: folder.agentsMd)
-        let first = try FileWriting.backUp(folder.agentsMd, on: day)
+        let first = try FileWriting.backUp(folder.agentsMd, into: folder.backups, on: day)
         try FileWriting.writeAtomically("two", to: folder.agentsMd)
-        let second = try FileWriting.backUp(folder.agentsMd, on: day)
+        let second = try FileWriting.backUp(folder.agentsMd, into: folder.backups, on: day)
 
         #expect(first != second)
         #expect(FileWriting.readText(first) == "one")

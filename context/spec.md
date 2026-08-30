@@ -571,7 +571,7 @@ When adopting an existing folder, `INDEX.md` is created (with this placeholder) 
 
 The templates (`CLAUDE.md`, `AGENTS.md`, `.claude/skills/petekm-*`) are **written once at setup and never auto-updated**. A new app version does not touch existing PeteKM folders.
 
-Settings provides a manual **Refresh Agent Files** action: it rewrites the current templates, first backing up any existing differing file alongside it (e.g. `AGENTS.md.bak-2026-08-20`). This keeps §19.2's no-silent-overwrite rule while giving users a way to adopt improved templates deliberately.
+Settings provides a manual **Refresh Agent Files** action: it rewrites the current templates, first backing up any existing differing file into the hidden `.petekm-backups/` folder (e.g. `.petekm-backups/AGENTS.md.bak-2026-08-20`). This keeps §19.2's no-silent-overwrite rule while giving users a way to adopt improved templates deliberately.
 
 ## 6.3 Git setup
 

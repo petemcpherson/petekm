@@ -90,10 +90,14 @@ final class AppSettings {
         static let backgroundHex = "petekm.backgroundHex"
         static let backgroundOpacity = "petekm.backgroundOpacity"
         static let textHex = "petekm.textHex"
+        static let scratchVisible = "petekm.scratchVisible"
+        static let scratchHeight = "petekm.scratchHeight"
     }
 
     /// Opacity floor: the window must stay findable.
     static let backgroundOpacityRange: ClosedRange<Double> = 0.1...1.0
+
+    static let scratchHeightRange: ClosedRange<Double> = 60...600
 
     static let suggestedShortcut = KeyCombo.suggested
 
@@ -116,6 +120,10 @@ final class AppSettings {
         showTableOfContents = defaults.object(forKey: Keys.showTableOfContents) as? Bool ?? false
         autoClosePairs = defaults.object(forKey: Keys.autoClosePairs) as? Bool ?? true
         continueListMarkers = defaults.object(forKey: Keys.continueListMarkers) as? Bool ?? true
+        scratchVisible = defaults.object(forKey: Keys.scratchVisible) as? Bool ?? false
+        _scratchHeight = AppSettings.clampScratchHeight(
+            defaults.object(forKey: Keys.scratchHeight) as? Double ?? 160
+        )
         floatOnTop = defaults.object(forKey: Keys.floatOnTop) as? Bool ?? false
         hideDockIcon = defaults.object(forKey: Keys.hideDockIcon) as? Bool ?? false
         hideMenuBarItem = defaults.object(forKey: Keys.hideMenuBarItem) as? Bool ?? false
@@ -165,6 +173,37 @@ final class AppSettings {
     /// Custom background color, if one is set. Opacity is applied by the caller.
     var backgroundColor: NSColor? {
         backgroundHex.flatMap(HexColor.color)
+    }
+
+    /// Whether the window's ground reads as dark, so an overlay knows which way to shift.
+    /// A custom background color wins over the system appearance — a light window in Dark
+    /// Mode still needs dark ink on it.
+    func groundIsDark(systemIsDark: Bool) -> Bool {
+        guard let color = backgroundColor?.usingColorSpace(.sRGB) else { return systemIsDark }
+        let luminance = 0.2126 * color.redComponent
+            + 0.7152 * color.greenComponent
+            + 0.0722 * color.blueComponent
+        return luminance < 0.5
+    }
+
+    /// Whether the Scratch pane is expanded. The pane's strip is always visible; this
+    /// only decides whether the editor under it is showing.
+    var scratchVisible: Bool {
+        didSet { defaults.set(scratchVisible, forKey: Keys.scratchVisible) }
+    }
+
+    var scratchHeight: Double {
+        get { _scratchHeight }
+        set {
+            _scratchHeight = AppSettings.clampScratchHeight(newValue)
+            defaults.set(_scratchHeight, forKey: Keys.scratchHeight)
+        }
+    }
+    private var _scratchHeight: Double
+
+    static func clampScratchHeight(_ value: Double) -> Double {
+        guard value.isFinite else { return scratchHeightRange.lowerBound }
+        return min(max(value, scratchHeightRange.lowerBound), scratchHeightRange.upperBound)
     }
 
     private static func clampOpacity(_ value: Double) -> Double {
@@ -262,6 +301,15 @@ final class AppSettings {
     }
 
     /// Font sizes offered in Settings — a short list beats a stepper here.
+    /// Scratch uses the editor's typography one step down — same family, same colors,
+    /// visibly a smaller surface.
+    var scratchEditorStyle: MarkdownStyle {
+        MarkdownStyle(fontSize: CGFloat(max(editorFontSize - 1, 10)),
+                      lineSpacing: CGFloat(max(editorLineSpacing - 1, 0)),
+                      fontName: editorFontName,
+                      textColor: textColor)
+    }
+
     static let editorFontSizes: [Double] = [11, 12, 13, 14, 15, 16, 18, 20]
 
     static let starterHeaders = """

@@ -29,6 +29,16 @@ struct PeteKMFolder: Equatable, Hashable {
     var inbox: URL { root.appending(path: "INBOX.md") }
     var state: URL { root.appending(path: ".petekm-state.json") }
     var gitignore: URL { root.appending(path: ".gitignore") }
+
+    /// The Scratch pane's backing file. Deliberately outside the daily/library contract:
+    /// dot-prefixed so the search index skips it, `.gitignore`d so Git Sync never commits
+    /// it, and named as off-limits in `CLAUDE.md`/`AGENTS.md`. Never a note.
+    /// Where every `.bak-` file goes — hidden, gitignored, out of the root listing.
+    var backups: URL { root.appending(path: ".petekm-backups", directoryHint: .isDirectory) }
+
+    var scratch: URL { root.appending(path: PeteKMFolder.scratchFilename) }
+
+    static let scratchFilename = ".petekm-scratch.md"
     var gitDirectory: URL { root.appending(path: ".git", directoryHint: .isDirectory) }
 
     var name: String { root.lastPathComponent }

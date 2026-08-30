@@ -62,6 +62,7 @@ Targets: `PeteKM` (app), `PeteKMTests` (**Swift Testing** — `@Test`/`#expect`)
 | `Files/` | Folder shape, bookmarks, atomic writes, initialization, templates, Git, watchers |
 | `Onboarding/` | First run + missing-folder recovery |
 | `Palette/` | ⌘K command palette, command catalog |
+| `Scratch/` | The Scratch pane — one durable-but-unfiled file, outside the contract |
 | `Search/` | Disposable full-text index, fuzzy match, ranking |
 | `Settings/` | Preferences model + tabbed Settings window + Sparkle |
 | `DesignSystem/` | `DS` tokens, PixelMark/Wordmark |
@@ -90,7 +91,7 @@ Targets: `PeteKM` (app), `PeteKMTests` (**Swift Testing** — `@Test`/`#expect`)
 | --- | --- |
 | `PeteKMFolder.swift` | **Start here.** Value type deriving every managed path from a root: `daily/`, `library/`, `.claude/skills/`, `INDEX.md`, `CLAUDE.md`, `AGENTS.md`, `INBOX.md`, `.petekm-state.json`, `.gitignore`. `dailySticky(for:)`, `dailyFilename(for:)` → `YYYY-MM-DD.md`. |
 | `FolderStore.swift` | `@Observable`. Holds active folder; persists a security-scoped bookmark in `UserDefaults`. `State = .unset / .ready(PeteKMFolder) / .missing(lastKnownPath:)` (§19.6). |
-| `FileWriting.swift` | Atomic write (temp + rename), read, exists, and `backUp(_:)` → `<name>.bak-YYYY-MM-DD` with a disambiguating counter (§6.5, §19.2). |
+| `FileWriting.swift` | Atomic write (temp + rename), read, exists, and `backUp(_:into:)` → `.petekm-backups/<name>.bak-YYYY-MM-DD` with a disambiguating counter (§6.5, §19.2). |
 | `FolderInitializer.swift` | Creates the folder shape. `ExistingFilePolicy = .keep` (onboarding — never overwrite) or `.backUpThenReplace` (Refresh Agent Files, §6.5). Returns a `Report` (created/kept/backedUp/failed) with a terse `summary`. |
 | `AgentTemplates.swift` | ~450L of template strings the app writes into a user's folder: `INDEX.md`, `CLAUDE.md`, `AGENTS.md`, `.gitignore`, state, and 5 skills. **Editing these is a product-content change, not an app change.** |
 | `DirectoryWatcher.swift` | FSEvents/DispatchSource watcher; drives external-change detection and index refresh. |
@@ -106,6 +107,7 @@ library/**.md                mutable knowledge, AI curates
 .claude/skills/petekm-{process-today,process-date,rebuild-index,organize,status}/SKILL.md
 INDEX.md   CLAUDE.md   AGENTS.md   INBOX.md
 .petekm-state.json           disposable agent state
+.petekm-scratch.md           Scratch pane; not a note (see Layer 3b)
 .gitignore
 ```
 
@@ -122,6 +124,28 @@ The capture loop. Read `DailySession` first.
 | `NewDayPrompt.swift` | The tiny "ask each day" prompt (§7.3). |
 | `MarkdownHeadings.swift` | Heading parse used by carry-forward. |
 | `DailyStickyView.swift` | Main screen (~300L). Wires `DailySession` + `EditorController` + `PaletteModel`, hosts the conflict alert, TOC, and the transient notice line. |
+
+## Layer 3b — Scratch (`PeteKM/Scratch/`)
+
+Durable but temporary: one file, same content every day, deliberately outside the
+daily/library contract. Not a note, and never becomes one.
+
+| File | Role |
+| --- | --- |
+| `ScratchStore.swift` | `@MainActor @Observable`. Wraps a `StickyDocument` on `folder.scratch` (`.petekm-scratch.md`), watches the root, `clear()` backs up before emptying. Nothing is date-keyed — that is why it carries over. |
+| `ScratchPaneView.swift` | Collapsible pane under the editor: strip (first line when collapsed), drag-to-resize handle, smaller `MarkdownEditor`, clear button. ⌘⇧S toggles. |
+| `ScratchTexture` (same file) | The pane's ground — a wash plus a tiled 7pt dot grid, both pure alpha so a transparent window stays transparent. Shifts light or dark off `AppSettings.groundIsDark(systemIsDark:)`, which prefers the user's custom background color over the system appearance. Tiles are cached; the pane's body re-runs on every keystroke. |
+
+**Four independent exclusions.** Break one and the feature's promise is broken:
+
+1. Dot-prefixed → `SearchIndexBuilder.scan` skips it (`SearchIndex.swift`) → never searched,
+   never in Open Library File…, never in the TOC.
+2. In `.gitignore` (with `.petekm-backups/`) → `Git Sync` never commits it. Folders created before the
+   feature are repaired by `FolderInitializer.ensureScratchIgnored` on window open.
+3. Outside `daily/` and `library/` → outside every path the agent is pointed at.
+4. Named as off-limits in the `CLAUDE.md` and `AGENTS.md` templates (`AgentTemplates.swift`).
+
+Plain text on disk, not encrypted. The Guide and Settings copy say so; don't imply otherwise.
 
 ## Layer 4 — Editor (`PeteKM/Editor/`)
 
@@ -148,7 +172,7 @@ Custom `NSTextView`, not `TextEditor`. Syntax markers stay on screen.
 
 ### Command catalog (user-facing surface)
 
-`Open Daily Sticky` · `Open Previous Daily Sticky` · `Open Date…` ·
+`Open Daily Sticky` · `Open Previous Daily Sticky` · `Open Date…` · `Open Scratch` ·
 `Search All PeteKM…` · `Open Library File…` · `Open Library Index` ·
 `Open Library in <editor>` · `Open PeteKM Folder in <editor>` ·
 `Open Current File in <editor>` · `Review Inbox` · `Open Terminal in PeteKM Folder` ·
@@ -165,8 +189,8 @@ Custom `NSTextView`, not `TextEditor`. Syntax markers stay on screen.
 
 | File | Role |
 | --- | --- |
-| `AppSettings.swift` | `@Observable`, `UserDefaults`-backed. Keys are namespaced `petekm.*`: `dailyStartBehavior`, `defaultHeaders`, `showDateHeading`, `globalShortcut`, `hasCompletedOnboarding`, `editorFontName/Size/LineSpacing`, `showTableOfContents`, `autoClosePairs`, `continueListMarkers`, `floatOnTop`, `hideDockIcon`, `hideMenuBarItem`, `automaticUpdateChecks`, `backgroundHex`, `backgroundOpacity`, `textHex` (window color/transparency + editor text color, all in the Editor tab; `HexColor` parser lives here; window is non-opaque, `DailyStickyView` paints the background). **No AI settings exist, now or later (§18.8).** |
-| `SettingsView.swift` | Tabs: General, Daily Sticky, Editor (+ Folder, Guide, Updates panes). |
+| `AppSettings.swift` | `@Observable`, `UserDefaults`-backed. Keys are namespaced `petekm.*`: `dailyStartBehavior`, `defaultHeaders`, `showDateHeading`, `globalShortcut`, `hasCompletedOnboarding`, `editorFontName/Size/LineSpacing`, `showTableOfContents`, `autoClosePairs`, `continueListMarkers`, `scratchVisible`, `scratchHeight`, `floatOnTop`, `hideDockIcon`, `hideMenuBarItem`, `automaticUpdateChecks`, `backgroundHex`, `backgroundOpacity`, `textHex` (window color/transparency + editor text color, all in the Editor tab; `HexColor` parser lives here; window is non-opaque, `DailyStickyView` paints the background). **No AI settings exist, now or later (§18.8).** |
+| `SettingsView.swift` | Tabs: General, Daily Sticky (incl. Scratch), Editor (+ Folder, Guide, Updates panes). |
 | `FolderSettingsView.swift` | Change folder, Refresh Agent Files, Git init/status. |
 | `GuideSettingsView.swift` | In-app explanation of the daily/library contract. |
 | `UpdateController.swift` | All Sparkle code behind `#if canImport(Sparkle)`. Reads `SUFeedURL`; inert without it. Never auto-installs. |
@@ -193,6 +217,7 @@ controls over custom chrome.
 | `DailyStickyTests.swift` | Largest. Session reopen semantics, New Day composition, autosave, conflict resolution. |
 | `FolderInitializerTests.swift` | Folder shape, zero-padded filenames, keep-vs-backup policy. |
 | `SearchTests.swift` | Index scan, ranking, fuzzy match, date parsing. |
+| `ScratchTests.swift` | Scratch path, the four exclusions, gitignore migration, persistence, clear-with-backup. |
 | `EditorTests.swift` | Highlighter, auto-close, list continuation, outline. |
 | `SettingsTests.swift` | Defaults round-trip, start-behavior. |
 | `ExternalToolsTests.swift` | Editor/Terminal/Git outcome branches. |
@@ -210,6 +235,7 @@ controls over custom chrome.
 | "Does feature X exist / is it tested?" | `context/ACCEPTANCE.md` |
 | Change what a new day starts with | `NewDayComposer.swift`, `AppSettings.dailyStartBehavior` |
 | Anything touching disk writes | `FileWriting.swift` → `StickyDocument.swift` |
+| Anything touching Scratch | `ScratchStore.swift` → the exclusions list in Layer 3b |
 | Add a palette command | `PaletteCommand.swift` (catalog) → `PaletteModel.commit` → `PaletteOutcome` handler in `DailyStickyView` |
 | Change what the app writes into a user's folder | `AgentTemplates.swift` (**product content**) |
 | Editor rendering or key behavior | `MarkdownSyntaxHighlighter.swift`, `EditorEdits.swift`, `MarkdownTextView.swift` |

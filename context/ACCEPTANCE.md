@@ -15,6 +15,22 @@ automated coverage that guards it.
 | Blank / carry-forward / default-header starts | `NewDayComposer`, `AppSettings.dailyStartBehavior` | `DailySessionTests`, `SettingsTests` |
 | Carry-forward copies headings only | `MarkdownHeadings`, `NewDayComposer` | `DailySessionTests/carryForwardUsesTheMostRecentPriorSticky` |
 
+## Scratch (durable but unfiled)
+
+| Criterion | Where | Covered by |
+| --- | --- | --- |
+| One pane, same content every day and every file | `ScratchStore` — nothing is keyed to a date | `ScratchTests/scratchPersistsAcrossStores` |
+| Never searched, never in the TOC or file open | `.petekm-scratch.md` is dot-prefixed; `SearchIndexBuilder.scan` skips dotfiles | `ScratchTests/scratchIsNeverIndexed` |
+| Never committed or pushed | `AgentTemplates.gitignore`, `FolderInitializer.ensureScratchIgnored` (repairs pre-existing folders) | `ScratchTests` gitignore tests, `FolderInitializerTests/neverOverwritesExistingFiles` |
+| Never read or filed by the agent | Off-limits clauses in `AgentTemplates.claudeMd` / `.agentsMd`; the file sits outside `daily/` and `library/` | `ScratchTests/agentFilesForbidReadingScratch` |
+| No file until the user types | `ScratchStore.init` treats a missing file as empty | `ScratchTests/scratchWritesNothingUntilTheUserTypes` |
+| Clearing is recoverable | `ScratchStore.clear` backs up to `.petekm-backups/….bak-YYYY-MM-DD` first (also gitignored) | `ScratchTests/clearingScratchKeepsABackup` |
+| Reachable without the mouse | ⌘⇧S in `DailyStickyView`, `Open Scratch` in the palette | `ScratchTests/scratchIsReachableFromTheCommandPalette` |
+
+| Reads as a different surface without new chrome | `ScratchTexture` wash + dot grid, keyed to the effective window ground | `ScratchTests/scratchGroundFollowsTheWindowNotJustTheSystemAppearance` |
+
+Not encrypted, and the Guide and Settings copy say so.
+
 ## Markdown ownership
 
 | Criterion | Where |

@@ -9,7 +9,9 @@ struct DailyStickyView: View {
     let folder: PeteKMFolder
 
     @State private var session: DailySession?
+    @State private var scratch: ScratchStore?
     @State private var editorController = EditorController()
+    @State private var scratchController = EditorController()
     @State private var palette = PaletteModel()
     @State private var keyMonitor: Any?
     /// Transient one-line result of an external-tool action (DESIGN §32).
@@ -41,6 +43,7 @@ struct DailyStickyView: View {
             header(session)
             Divider()
             editor(session)
+            scratchPane
         }
         .overlay {
             if let options = session.newDayOptions {
@@ -60,6 +63,7 @@ struct DailyStickyView: View {
             palette.configure(folder: folder) { perform($0, session: session) }
             installPaletteShortcut()
             noticeIfAgentFilesOutOfDate()
+            prepareScratch()
         }
         .onDisappear {
             removePaletteShortcut()
@@ -70,6 +74,7 @@ struct DailyStickyView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             session.handleActivation()
+            scratch?.document.reconcileWithDisk()
         }
         // Summoned by the global shortcut: recheck the date, then land the cursor where it was (§8.2, §8.3).
         .onReceive(NotificationCenter.default.publisher(for: .peteKMDidSummon)) { _ in
@@ -78,11 +83,16 @@ struct DailyStickyView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willResignActiveNotification)) { _ in
             session.flush()
+            scratch?.flush()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
             session.flush()
+            scratch?.flush()
         }
-        .onDisappear { session.flush() }
+        .onDisappear {
+            session.flush()
+            scratch?.flush()
+        }
     }
 
     // MARK: - Palette
@@ -93,20 +103,73 @@ struct DailyStickyView: View {
         guard keyMonitor == nil else { return }
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             guard event.modifierFlags.contains(.command),
-                  !event.modifierFlags.contains(.option),
-                  event.charactersIgnoringModifiers?.lowercased() == "k"
+                  !event.modifierFlags.contains(.option)
             else { return event }
 
-            Task { @MainActor in
-                if palette.isPresented { palette.dismiss() } else { palette.present() }
+            switch event.charactersIgnoringModifiers?.lowercased() {
+            case "k" where !event.modifierFlags.contains(.shift):
+                Task { @MainActor in
+                    if palette.isPresented { palette.dismiss() } else { palette.present() }
+                }
+                return nil
+
+            case "s" where event.modifierFlags.contains(.shift):
+                Task { @MainActor in toggleScratch() }
+                return nil
+
+            default:
+                return event
             }
-            return nil
         }
     }
 
     private func removePaletteShortcut() {
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
         keyMonitor = nil
+    }
+
+    // MARK: - Scratch
+
+    /// One store for the life of the window. It is not rebuilt when the day rolls over or
+    /// when a Library file opens — carrying over is the point.
+    private func prepareScratch() {
+        guard scratch == nil else { return }
+        scratch = ScratchStore(folder: folder)
+
+        // Folders created before Scratch existed keep their own `.gitignore`; make sure it
+        // excludes the scratch file before the user can type anything into it.
+        let folder = folder
+        Task.detached(priority: .utility) {
+            FolderInitializer.ensureScratchIgnored(folder)
+        }
+    }
+
+    @ViewBuilder
+    private var scratchPane: some View {
+        if let scratch {
+            ScratchPaneView(store: scratch,
+                            settings: settings,
+                            controller: scratchController,
+                            isExpanded: Binding(get: { settings.scratchVisible },
+                                                set: { settings.scratchVisible = $0 }),
+                            height: Binding(get: { settings.scratchHeight },
+                                            set: { settings.scratchHeight = $0 }))
+                .conflictAlert(document: scratch.document)
+        }
+    }
+
+    private func showScratch() {
+        settings.scratchVisible = true
+        Task { @MainActor in scratchController.focusEditor() }
+    }
+
+    private func toggleScratch() {
+        if settings.scratchVisible {
+            settings.scratchVisible = false
+            editorController.focusEditor()
+        } else {
+            showScratch()
+        }
     }
 
     private func perform(_ outcome: PaletteOutcome, session: DailySession) {
@@ -116,6 +179,10 @@ struct DailyStickyView: View {
 
         case .openDaily(let date):
             session.open(date: date)
+
+        case .openScratch:
+            showScratch()
+            return
 
         case .openFile(let url, let reveal):
             session.open(fileURL: url, reveal: reveal)
@@ -230,6 +297,12 @@ struct DailyStickyView: View {
             }
             .toggleStyle(.button)
             .help("Table of Contents")
+            Toggle(isOn: Binding(get: { settings.scratchVisible },
+                                 set: { settings.scratchVisible = $0 })) {
+                Image(systemName: "note.text")
+            }
+            .toggleStyle(.button)
+            .help("Scratch (⌘⇧S)")
             if let error = session.document?.lastError ?? session.lastError {
                 Text(error)
                     .font(DS.Text.caption)

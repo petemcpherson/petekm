@@ -193,6 +193,9 @@ final class PaletteModel {
             }
             perform(.openFile(url, reveal: nil))
 
+        case .openScratch:
+            perform(.openScratch)
+
         case .openDate:
             present(mode: .date)
 

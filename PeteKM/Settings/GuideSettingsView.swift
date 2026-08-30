@@ -36,6 +36,7 @@ struct GuideSettingsView: View {
                     GuideKeyed("Open Date…", "any past day")
                     GuideKeyed("Search All PeteKM…", "full text, daily and Library")
                     GuideKeyed("Open Library File…", "fuzzy filename match")
+                    GuideKeyed("Open Scratch", "the pane under the editor")
                     GuideKeyed("Open Terminal in PeteKM Folder", "where processing happens")
                     GuideLine("⌘, or ⌘. opens Settings.")
                 }
@@ -70,7 +71,15 @@ struct GuideSettingsView: View {
                     GuideLine("You can also just talk to the agent: \"find everything I wrote about certificate auth and tell me what's still unresolved.\"")
                 }
 
-                GuideSection("7. Things worth trusting") {
+                GuideSection("7. Scratch") {
+                    GuideLine("The pane under the editor is Scratch. It holds the same text every day, no matter which file is open. Nothing carries it forward — there is only ever one of it.")
+                    GuideLine("It is for what you don't want kept: a to-do list for the next few days, a phone number for this afternoon, a key you pasted once and will delete.")
+                    GuideLine("The agent is told never to read it, quote it, or file it. It's excluded from search, and it's listed in `.gitignore`, so Git Sync never sends it anywhere.")
+                    GuideLine("⌘⇧S shows and hides it. Drag its top edge to resize. It empties only when you clear it — the cleared text is kept as a `.bak` file in `.petekm-backups/`.")
+                    GuideLine("It is plain text on disk, not encrypted. Nothing about it is private from anyone who can read your folder.")
+                }
+
+                GuideSection("8. Things worth trusting") {
                     GuideLine("The `.md` files are the whole product. Indexes, caches, and `.petekm-state.json` are disposable and rebuildable.")
                     GuideLine("PeteKM is not the only writer. Edit the same files in \(PaletteCommandID.editorName) or Finder; external changes are detected rather than clobbered.")
                     GuideLine("Capture never blocks. A failed Git Sync, a missing editor, or an agent that isn't installed can't stop you from opening or saving today.")

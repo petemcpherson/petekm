@@ -50,8 +50,18 @@ enum AgentTemplates {
 
     static let gitignore = """
     .petekm-state.json
+    .petekm-scratch.md
+    .petekm-backups/
     .DS_Store
     """
+
+    /// Lines `.gitignore` must carry for the Scratch pane. Appended to an existing
+    /// `.gitignore` on folders created before Scratch existed — a missed line here
+    /// means private scratch text gets committed.
+    static let scratchIgnoreLines = [
+        ".petekm-scratch.md",
+        ".petekm-backups/",
+    ]
 
     // MARK: - .petekm-state.json (§5.7)
 
@@ -78,6 +88,7 @@ enum AgentTemplates {
     - `INBOX.md` — items that could not confidently be filed (created only when needed).
     - `AGENTS.md` — the full librarian policy.
     - `.petekm-state.json` — small, disposable operational state.
+    - `.petekm-scratch.md` — the user's private scratch pad. Not yours. See below.
 
     ## The rule that never bends
 
@@ -88,6 +99,16 @@ enum AgentTemplates {
     If you need to record processing state, write it to `.petekm-state.json`.
 
     `library/`, `INDEX.md`, and `INBOX.md` are yours to maintain.
+
+    ## The other rule that never bends
+
+    `.petekm-scratch.md` is the user's scratch pad, held open in the app beside the
+    Daily Sticky. It is scratch on purpose: short-lived lists, a pasted secret, a
+    reminder for the next few days. It is not knowledge and it is not a note.
+
+    Never read it, open it, grep it, summarize it, quote it, file it, copy any part
+    of it into `library/`, `INDEX.md`, or `INBOX.md`, or mention its contents. Treat
+    it as though the file were not there. It is `.gitignore`d for the same reason.
 
     ## Before filing anything
 
@@ -149,6 +170,13 @@ enum AgentTemplates {
 
     **`library/`, `INDEX.md`, and `INBOX.md` are mutable.** They exist to be
     maintained, corrected, merged, and reorganized over time.
+
+    **`.petekm-scratch.md` does not exist to you.** It is the user's scratch pad —
+    the pane under the Daily Sticky in the app — and it holds exactly the things
+    they do not want kept: a two-day to-do list, a pasted credential, a phone number
+    for this afternoon. Never read it, grep it, summarize it, quote it, or copy any
+    fragment of it anywhere. Never file it. Never mention what is in it. It is
+    `.gitignore`d and it is not knowledge.
 
     Your filing work stays inside this folder. Routine filing never needs to modify
     files elsewhere on the computer.

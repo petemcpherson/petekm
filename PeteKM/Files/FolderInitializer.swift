@@ -85,11 +85,44 @@ enum FolderInitializer {
             write(contents, to: url, in: folder, policy: effectivePolicy, now: now, into: &report)
         }
 
+        // An adopted folder keeps its own `.gitignore`; it still has to exclude Scratch.
+        if ensureScratchIgnored(folder), !report.created.contains(".gitignore") {
+            report.created.append(".gitignore")
+            report.kept.removeAll { $0 == ".gitignore" }
+        }
+
         return report
     }
 
     /// True when any agent file on disk differs from the shipped template, or is
     /// missing — i.e. Refresh Agent Files would change something.
+    /// Guarantees `.gitignore` excludes the Scratch file.
+    ///
+    /// `.gitignore` is written with policy `.keep`, so a folder created before Scratch
+    /// existed would never gain the line on its own — and a missed line here means the
+    /// user's private scratch text gets committed and pushed. The lines are appended to
+    /// whatever the user already has rather than replacing it. Returns true if it wrote.
+    @discardableResult
+    static func ensureScratchIgnored(_ folder: PeteKMFolder) -> Bool {
+        let url = folder.gitignore
+
+        guard let existing = FileWriting.readText(url) else {
+            try? FileWriting.writeAtomically(AgentTemplates.gitignore, to: url)
+            return true
+        }
+
+        let present = Set(existing.split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) })
+        let missing = AgentTemplates.scratchIgnoreLines.filter { !present.contains($0) }
+        guard !missing.isEmpty else { return false }
+
+        var text = existing
+        if !text.isEmpty && !text.hasSuffix("\n") { text += "\n" }
+        text += missing.joined(separator: "\n") + "\n"
+        try? FileWriting.writeAtomically(text, to: url)
+        return true
+    }
+
     static func agentFilesAreOutOfDate(_ folder: PeteKMFolder) -> Bool {
         var items: [(URL, String)] = [(folder.claudeMd, AgentTemplates.claudeMd),
                                       (folder.agentsMd, AgentTemplates.agentsMd)]
@@ -133,6 +166,8 @@ enum FolderInitializer {
                   policy: .backUpThenReplace, now: now, into: &report)
         }
 
+        if ensureScratchIgnored(folder) { report.created.append(".gitignore") }
+
         return report
     }
 
@@ -159,7 +194,7 @@ enum FolderInitializer {
                     return
                 }
                 do {
-                    try FileWriting.backUp(url, on: now)
+                    try FileWriting.backUp(url, into: folder.backups, on: now)
                     report.backedUp.append(relative)
                 } catch {
                     report.failed.append(relative)

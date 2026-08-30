@@ -36,15 +36,19 @@ enum FileWriting {
 
     /// Move `url` aside as `<name>.bak-YYYY-MM-DD`, disambiguating with a
     /// counter so an existing backup is never clobbered (§6.5, §19.2).
+    /// Move `url` aside into `directory` as `<name>.bak-YYYY-MM-DD`, disambiguating
+    /// with a counter so an existing backup is never clobbered (§6.5, §19.2).
+    /// Backups live in one hidden folder so they never clutter the PeteKM root.
     @discardableResult
-    static func backUp(_ url: URL, on date: Date = Date(), calendar: Calendar = .current) throws -> URL {
+    static func backUp(_ url: URL, into directory: URL, on date: Date = Date(), calendar: Calendar = .current) throws -> URL {
         let parts = calendar.dateComponents([.year, .month, .day], from: date)
         let stamp = String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
         let base = url.lastPathComponent
-        var candidate = url.deletingLastPathComponent().appending(path: "\(base).bak-\(stamp)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        var candidate = directory.appending(path: "\(base).bak-\(stamp)")
         var counter = 2
         while exists(candidate) {
-            candidate = url.deletingLastPathComponent().appending(path: "\(base).bak-\(stamp)-\(counter)")
+            candidate = directory.appending(path: "\(base).bak-\(stamp)-\(counter)")
             counter += 1
         }
         try FileManager.default.moveItem(at: url, to: candidate)
