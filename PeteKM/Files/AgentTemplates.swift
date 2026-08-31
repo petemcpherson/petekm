@@ -14,8 +14,7 @@ import Foundation
 enum AgentTemplates {
 
     static let skillNames = [
-        "petekm-process-today",
-        "petekm-process-date",
+        "petekm-process",
         "petekm-rebuild-index",
         "petekm-organize",
         "petekm-status",
@@ -120,8 +119,7 @@ enum AgentTemplates {
 
     Project skills live in `.claude/skills/`:
 
-    - `/petekm-process-today` — file today's Daily Sticky into the Library.
-    - `/petekm-process-date` — the same, for a given date or daily filename.
+    - `/petekm-process` — file new Daily Stickies into the Library; pass a date to reprocess one day.
     - `/petekm-rebuild-index` — regenerate `INDEX.md` from the Library.
     - `/petekm-organize` — deliberate Library restructuring.
     - `/petekm-status` — what has and has not been processed.
@@ -321,7 +319,24 @@ enum AgentTemplates {
     `INBOX.md`. The app shows no AI status of any kind — your terminal output is the
     only feedback the user gets.
 
-    ## 14. Working at scale
+    ## 14. Sync
+
+    This folder may be a Git repository shared across two machines. When it is,
+    `/petekm-process` pulls before it reads and commits, pulls again, and pushes
+    after it writes — so the Library you file into is current, and your work reaches
+    the other device promptly.
+
+    The rules are the same ones the app follows:
+
+    - Commit before any network operation. Nothing on disk is ever exposed to a pull
+      while uncommitted.
+    - Never force-push. Not as a fallback, not ever.
+    - Never resolve a conflict on your own — not "pick newer", not "merge and hope".
+      A conflict stops the run and asks the user.
+    - No Git, or no repository, or no remote → carry on and say so plainly at the
+      end. Missing Git never blocks filing.
+
+    ## 15. Working at scale
 
     Assume this folder is large. Read `CLAUDE.md`, then the Placement guide and
     Areas of `INDEX.md`; grep the Files section. Search filenames, headings, and full
@@ -333,8 +348,7 @@ enum AgentTemplates {
 
     static func skill(_ name: String) -> String {
         switch name {
-        case "petekm-process-today": return processToday
-        case "petekm-process-date": return processDate
+        case "petekm-process": return process
         case "petekm-rebuild-index": return rebuildIndex
         case "petekm-organize": return organize
         case "petekm-status": return status
@@ -342,20 +356,43 @@ enum AgentTemplates {
         }
     }
 
-    private static let processToday = """
+    private static let process = """
     ---
-    name: petekm-process-today
-    description: File today's Daily Sticky into the Library. Use when the user asks to process, file, or organize today's notes in a PeteKM folder, or invokes /petekm-process-today.
+    name: petekm-process
+    description: File new Daily Stickies into the Library. With no argument, process every Daily Sticky newer than the last processed one, oldest-first; pass a date, filename, or plain-language date to reprocess just that day. Use when the user asks to process, file, catch up on, or organize notes in a PeteKM folder, or invokes /petekm-process.
     ---
 
-    # Process today's Daily Sticky
+    # Process Daily Stickies
 
     Read `AGENTS.md` first. Its policy governs everything below.
 
     ## Steps
 
-    1. Determine today's local date and open `daily/YYYY-MM-DD.md`. If it does not
-       exist, say so and stop — do not create it.
+    0. **Pull first.** Run:
+
+       ```bash
+       git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git pull --rebase --autostash
+       ```
+
+       Not a Git repository, or Git isn't installed → skip silently and carry on;
+       Process is never blocked by the absence of Git. If the pull reports a
+       conflict, **stop entirely and process nothing.** Report: "Sync conflict —
+       couldn't pull latest changes before processing. Resolve it (ask me, or run
+       `git status` yourself), then run /petekm-process again." Never process
+       against a repo mid-conflict, and never guess which side is right.
+    1. **Pick the target Daily Stickies.**
+       - **No argument (the common case):** read `lastProcessedDailyNote` from
+         `.petekm-state.json` and list every `daily/*.md` whose date is newer.
+         Process them **oldest-first, one file at a time**, so later days can build
+         on Library files the earlier days created. It makes no difference whether
+         the app created a file or the user dropped it in by hand — a Daily Sticky
+         is just `daily/YYYY-MM-DD.md`. If the state file is missing or the marker
+         is null, ask which day to start from rather than processing everything.
+       - **One argument:** resolve it to a single daily file — accept `2026-08-19`,
+         `2026-08-19.md`, `daily/2026-08-19.md`, or a plain-language date. Ambiguous
+         → ask. Missing → list nearby existing Daily Stickies and stop. Process only
+         that day, regardless of the state marker.
+       - Nothing newer to process → say so and stop.
     2. Read the Daily Sticky in full. Do not modify it in any way.
     3. Check `INDEX.md` freshness: if any path in its Files section no longer
        exists, or `find library -name '*.md' -newer INDEX.md` prints anything,
@@ -373,42 +410,33 @@ enum AgentTemplates {
        you successfully filed.
     9. Add a Files line for every file you created, and update Areas counts or
        the Placement guide if they changed. Do not rewrite the rest of the index.
-    10. On success, update `.petekm-state.json` with `lastSuccessfulProcessing` (ISO
-        8601, local offset) and `lastProcessedDailyNote`.
-    11. Report: files created, files updated, items skipped, and the count sent to
-        `INBOX.md`.
+    10. Repeat steps 2–9 for each remaining target, oldest-first.
+    11. On success, update `.petekm-state.json`: `lastSuccessfulProcessing` (ISO
+        8601, local offset), and `lastProcessedDailyNote` **only if** this run
+        processed a note newer than the recorded one. Back-filling or reprocessing
+        an older day never moves the marker backward or falsely forward.
+    12. **Commit and publish.** Run:
+
+        ```bash
+        git add -A && git commit -m "PeteKM: processed <dates>" && git pull --rebase --autostash && git push
+        ```
+
+        The second pull matters: the app or another device may have pushed while
+        you were processing. If that pull conflicts, your commit is safe on the
+        local branch — report "Processed successfully and committed locally, but
+        couldn't sync — conflict pulling latest changes. Run Sync from the app, or
+        ask me." No remote configured → the commit still stands; report "Processed
+        and committed locally. No GitHub remote is set, so nothing was pushed."
+        Not a Git repository → skip this step silently.
+    13. Report: dates processed, files created, files updated, items skipped, the
+        count sent to `INBOX.md`, and the sync result.
 
     ## Never
 
     - Modify anything in `daily/`.
     - Restructure the Library — that is `/petekm-organize`.
     - Guess a destination to avoid using the Inbox.
-    """
-
-    private static let processDate = """
-    ---
-    name: petekm-process-date
-    description: File a specific past Daily Sticky into the Library, given a date or daily filename. Use when catching up on missed days, importing older notes, or re-running a day after changing librarian rules, or when the user invokes /petekm-process-date.
-    ---
-
-    # Process a specific Daily Sticky
-
-    Same procedure as `/petekm-process-today`, for a date the user names.
-
-    ## Steps
-
-    1. Resolve the argument to a daily file: accept `2026-08-19`, `2026-08-19.md`,
-       `daily/2026-08-19.md`, or a plain-language date. If it is ambiguous, ask.
-    2. If the file does not exist, list nearby existing Daily Stickies and stop.
-    3. Read `AGENTS.md`, then follow `/petekm-process-today` steps 2–9 against that
-       file.
-    4. Update `.petekm-state.json` only if this run processed a note **newer** than
-       the recorded `lastProcessedDailyNote`; back-filling an older day must not make
-       newer days look processed.
-    5. Report as usual, naming the date you processed.
-
-    If asked for a range of dates, process them oldest-first, one file at a time, so
-    later days can build on Library files the earlier days created.
+    - Force-push, or resolve a sync conflict on your own.
     """
 
     private static let rebuildIndex = """
@@ -530,9 +558,14 @@ enum AgentTemplates {
     4. Whether `INDEX.md` looks stale — any Library file newer than it, any Files
        path that no longer resolves, or any top-level folder missing from Areas.
     5. `INBOX.md`: item count, or "Nothing in Inbox."
-    6. If the folder is a Git repository, whether the working tree is clean.
+    6. If the folder is a Git repository, whether the working tree is clean, and how
+       it stands against the remote — from
+       `git rev-list --left-right --count HEAD...@{upstream}`, worded plainly:
+       "3 commits not yet pushed", "2 new commits on GitHub, not yet pulled", or
+       "Up to date with GitHub." If there is no upstream, omit the line; do not
+       report it as an error.
 
     Keep it short and concrete. End with the single most useful next command, if
-    there is one.
+    there is one — usually `/petekm-process`.
     """
 }

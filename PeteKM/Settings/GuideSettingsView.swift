@@ -44,16 +44,17 @@ struct GuideSettingsView: View {
                 GuideSection("3. Process a day") {
                     GuideLine("Filing is done by your own agent in a terminal, not by this app. PeteKM writes the instructions into the folder; the agent reads them.")
                     GuideLine("Open Terminal in PeteKM Folder, start Claude Code, then run:")
-                    GuideCode("/petekm-process-today")
-                    GuideLine("It reads today's Daily Sticky, searches the Library, and updates or creates Library files with a `Source:` line pointing back at the day.")
+                    GuideCode("/petekm-process")
+                    GuideLine("It reads every Daily Sticky you haven't processed yet, oldest first, searches the Library, and updates or creates Library files with a `Source:` line pointing back at the day.")
                     GuideLine("It never edits `daily/`. That folder is an append-only ledger — no rewrites, no \"processed\" markers, no grammar fixes.")
                     GuideLine("`/petekm-status` reports what has and has not been processed.")
                 }
 
                 GuideSection("4. Process notes you added by hand") {
                     GuideLine("Backfilling old notes works. Put each one in `daily/` named exactly `YYYY-MM-DD.md` — the filename is the date.")
-                    GuideLine("Then process each one by date:")
-                    GuideCode("/petekm-process-date 2026-08-11")
+                    GuideLine("Then just run Process. Plain `/petekm-process` picks up everything newer than the last processed day, oldest-first, whether the app created the file or you did.")
+                    GuideLine("To redo one specific day, pass it a date:")
+                    GuideCode("/petekm-process 2026-08-11")
                     GuideLine("Same rules apply: the file you dropped in is never modified.")
                     GuideLine("Open Date… in the palette opens a backfilled day like any other. There is no import step.")
                 }

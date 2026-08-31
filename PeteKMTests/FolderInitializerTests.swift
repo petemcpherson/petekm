@@ -112,6 +112,75 @@ struct FolderInitializerTests {
         #expect(report.kept.contains("CLAUDE.md"))
     }
 
+    /// Hand-writes the two skills that `/petekm-process` replaced (sync spec §3.5).
+    private func writeRetiredSkills(in folder: PeteKMFolder) throws {
+        for name in ["petekm-process-today", "petekm-process-date"] {
+            let url = folder.skill(name)
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
+                                                    withIntermediateDirectories: true)
+            try FileWriting.writeAtomically("# old \(name)\n", to: url)
+        }
+    }
+
+    @Test func refreshRetiresTheRenamedProcessSkills() throws {
+        let folder = try makeTemporaryFolder()
+        defer { remove(folder) }
+
+        _ = try FolderInitializer.initialize(folder)
+        try writeRetiredSkills(in: folder)
+
+        let report = try FolderInitializer.refreshAgentFiles(
+            folder, now: Date(timeIntervalSince1970: 1_787_000_000))
+
+        for name in ["petekm-process-today", "petekm-process-date"] {
+            let url = folder.skill(name)
+            #expect(!FileWriting.exists(url))
+            #expect(!FileWriting.isDirectory(url.deletingLastPathComponent()))
+            #expect(report.backedUp.contains(".claude/skills/\(name)/SKILL.md"))
+            let backups = try FileManager.default
+                .contentsOfDirectory(atPath: folder.backups.path(percentEncoded: false))
+                .filter { $0.hasPrefix("SKILL.md.bak-") }
+            #expect(!backups.isEmpty)
+        }
+
+        #expect(FileWriting.readText(folder.skill("petekm-process"))
+                == AgentTemplates.skill("petekm-process"))
+        #expect(report.failed.isEmpty)
+    }
+
+    @Test func retiringTheRenamedSkillsIsIdempotent() throws {
+        let folder = try makeTemporaryFolder()
+        defer { remove(folder) }
+
+        _ = try FolderInitializer.initialize(folder)
+        try writeRetiredSkills(in: folder)
+        _ = try FolderInitializer.refreshAgentFiles(folder)
+
+        let second = try FolderInitializer.refreshAgentFiles(folder)
+        #expect(second.summary == "Already up to date.")
+        #expect(second.backedUp.isEmpty)
+        #expect(second.created.isEmpty)
+    }
+
+    @Test func aStrayFileKeepsARetiredSkillDirectory() throws {
+        let folder = try makeTemporaryFolder()
+        defer { remove(folder) }
+
+        _ = try FolderInitializer.initialize(folder)
+        try writeRetiredSkills(in: folder)
+        let stray = folder.skill("petekm-process-date")
+            .deletingLastPathComponent().appending(path: "notes.md")
+        try FileWriting.writeAtomically("mine\n", to: stray)
+
+        let report = try FolderInitializer.refreshAgentFiles(folder)
+
+        #expect(FileWriting.exists(stray))
+        #expect(!FileWriting.exists(folder.skill("petekm-process-date")))
+        #expect(!FileWriting.isDirectory(folder.skill("petekm-process-today")
+            .deletingLastPathComponent()))
+        #expect(report.failed.isEmpty)
+    }
+
     @Test func backupsNeverClobberEachOther() throws {
         let folder = try makeTemporaryFolder()
         defer { remove(folder) }
@@ -139,6 +208,22 @@ struct AgentTemplateTests {
         }
     }
 
+    @Test func processIsOneSkillThatSyncsAroundFiling() {
+        #expect(AgentTemplates.skillNames.contains("petekm-process"))
+        #expect(!AgentTemplates.skillNames.contains("petekm-process-today"))
+        #expect(!AgentTemplates.skillNames.contains("petekm-process-date"))
+        #expect(AgentTemplates.skill("petekm-process-today").isEmpty)
+
+        let process = AgentTemplates.skill("petekm-process")
+        #expect(process.contains("git pull --rebase --autostash"))
+        #expect(process.contains("git push"))
+        #expect(!process.contains("--force"))
+        #expect(process.contains("lastProcessedDailyNote"))
+        #expect(AgentTemplates.claudeMd.contains("/petekm-process` —"))
+        #expect(!AgentTemplates.claudeMd.contains("process-today"))
+        #expect(AgentTemplates.skill("petekm-status").contains("@{upstream}"))
+    }
+
     @Test func templatesStateTheImmutableLedgerRule() {
         #expect(AgentTemplates.claudeMd.contains("read-only"))
         #expect(AgentTemplates.agentsMd.contains("immutable ledger"))
@@ -151,7 +236,7 @@ struct AgentTemplateTests {
             #expect(AgentTemplates.index.contains(section))
         }
         #expect(AgentTemplates.index.contains("library/Lists/"))
-        #expect(AgentTemplates.skill("petekm-process-today").contains("freshness"))
+        #expect(AgentTemplates.skill("petekm-process").contains("freshness"))
         #expect(AgentTemplates.skill("petekm-rebuild-index").contains("incremental"))
         #expect(AgentTemplates.agentsMd.contains("Placement guide"))
     }

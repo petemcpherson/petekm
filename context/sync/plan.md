@@ -11,7 +11,7 @@ check and conflict verification, then the agent-side templates + migration.
 
 - [x] **Phase 1 — App-side Sync: two-way `GitSupport.sync`, new `SyncOutcome`, Set Remote, "Sync" rename**
 - [x] **Phase 2 — Launch check, "Changes to sync." banner, external-change verification**
-- [ ] **Phase 3 — Unified `/petekm-process` skill, template rewrites, skill-rename migration**
+- [x] **Phase 3 — Unified `/petekm-process` skill, template rewrites, skill-rename migration**
 
 ---
 

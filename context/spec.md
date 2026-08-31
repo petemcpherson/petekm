@@ -1384,6 +1384,8 @@ Librarian workflows should be represented as repeatable AI-agent actions rather 
 
 For Claude Code, these should be represented as **project-local Skills** stored inside the PeteKM folder:
 
+> **Amended by `context/sync/spec.md` §3:** `petekm-process-today` and `petekm-process-date` are merged into a single `petekm-process` skill (no argument = every unprocessed day, oldest-first; one argument = that day only), which also pulls before and commits/pulls/pushes after. Every `/petekm-process-today` or `/petekm-process-date` reference below reads as `/petekm-process`.
+
 ```text
 .claude/
 └── skills/

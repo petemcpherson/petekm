@@ -105,7 +105,7 @@ What `FolderInitializer` produces in a user's PeteKM folder (spec §5):
 ```
 daily/YYYY-MM-DD.md          immutable ledger, AI never writes
 library/**.md                mutable knowledge, AI curates
-.claude/skills/petekm-{process-today,process-date,rebuild-index,organize,status}/SKILL.md
+.claude/skills/petekm-{process,rebuild-index,organize,status}/SKILL.md
 INDEX.md   CLAUDE.md   AGENTS.md   INBOX.md
 .petekm-state.json           disposable agent state
 .petekm-scratch.md           Scratch pane; not a note (see Layer 3b)

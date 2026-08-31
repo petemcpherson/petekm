@@ -157,6 +157,8 @@ enum FolderInitializer {
             report.created.append(relativePath(of: directory, in: folder))
         }
 
+        migrateRenamedSkills(folder, now: now, into: &report)
+
         write(AgentTemplates.claudeMd, to: folder.claudeMd, in: folder,
               policy: .backUpThenReplace, now: now, into: &report)
         write(AgentTemplates.agentsMd, to: folder.agentsMd, in: folder,
@@ -172,6 +174,42 @@ enum FolderInitializer {
     }
 
     // MARK: - Private
+
+    /// Skills that were renamed by a later version. Their `SKILL.md` is backed up
+    /// (hand-edits are preserved, same as every other tracked file) and the old
+    /// directory is removed, so Refresh Agent Files doesn't leave two dead slash
+    /// commands next to the one that replaced them (sync spec §3.5).
+    private static let retiredSkillNames = ["petekm-process-today", "petekm-process-date"]
+
+    private static func migrateRenamedSkills(
+        _ folder: PeteKMFolder,
+        now: Date,
+        into report: inout Report
+    ) {
+        for name in retiredSkillNames {
+            let url = folder.skill(name)
+            let directory = url.deletingLastPathComponent()
+
+            if FileWriting.exists(url) {
+                do {
+                    try FileWriting.backUp(url, into: folder.backups, on: now)
+                    report.backedUp.append(relativePath(of: url, in: folder))
+                } catch {
+                    report.failed.append(relativePath(of: url, in: folder))
+                    continue
+                }
+            }
+
+            // Only ever remove the directory if it is empty — anything else in
+            // there is the user's, not ours.
+            guard FileWriting.isDirectory(directory) else { continue }
+            let contents = try? FileManager.default.contentsOfDirectory(
+                atPath: directory.path(percentEncoded: false))
+            if contents?.isEmpty == true {
+                try? FileManager.default.removeItem(at: directory)
+            }
+        }
+    }
 
     private static func write(
         _ contents: String,
