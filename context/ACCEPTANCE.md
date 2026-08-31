@@ -80,7 +80,9 @@ never invokes, monitors, or parses an agent.
 | AI never modifies Daily Stickies | Agent templates (policy lives in the folder, not app code) | `FolderInitializerTests` |
 | Setup never silently overwrites | `FolderInitializer` `.keep` policy; Refresh backs up first | `neverOverwritesExistingFiles`, `refreshBacksUpDifferingAgentFiles`, `refreshNeverTouchesNotesOrTheIndex` |
 | External edits are normal | `DirectoryWatcher` + `StickyDocument` reload/conflict | `externalChangeReloadsSilentlyWhenClean`, `bothSidesChangedRaisesAConflict` |
-| Git failures never block capture | `GitSupport.sync` returns an outcome; Settings/palette show a notice | `syncKeepsTheLocalCommitWhenPushFails` |
+| Git failures never block capture | `GitSupport.sync` returns an outcome; Settings/palette show a notice | `syncKeepsTheLocalCommitWhenTheRemoteIsUnreachable` |
+| Sync never loses a two-device edit | `sync` aborts the rebase and restores the tree | `syncAbortsAndRestoresOnAConflict` |
+| Sync never force-pushes | `GitSupport.swift` has no `--force` / `--force-with-lease` in any path | grep, plus `ExternalToolsTests` sync outcomes |
 | App caches/state deletable | `SearchIndex` in Application Support, keyed by folder | `SearchTests/indexLivesOutsideThePeteKMFolder` |
 
 ## Scenarios §22 A–G
@@ -94,7 +96,16 @@ never invokes, monitors, or parses an agent.
 - **D. Fuzzy file open** — `FuzzyMatch` tests.
 - **E. Filing with an agent** — outside the app by design; the folder ships the skills.
 - **F. External edits / conflicts** — `StickyDocumentTests` conflict paths.
-- **G. Git backup** — `ExternalToolsTests` sync outcomes, one-way only.
+- **G. Sync** — `ExternalToolsTests` sync outcomes against a bare remote plus two
+  clones: push, pull-then-push, conflict abort, offline.
+
+## Sync (context/sync/spec.md §6)
+
+- **Capture never blocks (§6.6)** — manual: with `git` removed from `PATH`, with no
+  network, and immediately after a `pullConflict`, opening and saving today's Daily
+  Sticky still works. Sync only ever reports a notice.
+- **Commit precedes every network call (§6.1)** — `GitSupport.sync` commits before
+  `fetch`; a failed commit returns before any network step.
 
 ## Vocabulary audit (DESIGN §2, §39)
 

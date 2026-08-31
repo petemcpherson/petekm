@@ -31,7 +31,7 @@ struct PeteKMFolder: Equatable, Hashable {
     var gitignore: URL { root.appending(path: ".gitignore") }
 
     /// The Scratch pane's backing file. Deliberately outside the daily/library contract:
-    /// dot-prefixed so the search index skips it, `.gitignore`d so Git Sync never commits
+    /// dot-prefixed so the search index skips it, `.gitignore`d so Sync never commits
     /// it, and named as off-limits in `CLAUDE.md`/`AGENTS.md`. Never a note.
     /// Where every `.bak-` file goes — hidden, gitignored, out of the root listing.
     var backups: URL { root.appending(path: ".petekm-backups", directoryHint: .isDirectory) }

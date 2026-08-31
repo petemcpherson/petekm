@@ -237,7 +237,9 @@ struct DailyStickyView: View {
             let outcome = await Task.detached(priority: .utility) {
                 GitSupport.sync(folder)
             }.value
-            show(outcome.notice)
+            // A conflict asks something of the user; give it the longer notice.
+            show(outcome.notice(editorName: ExternalEditorProvider.current.displayName),
+                 seconds: outcome == .pullConflict ? 15 : 6)
         }
     }
 

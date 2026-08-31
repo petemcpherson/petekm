@@ -38,7 +38,38 @@ private func makeRepository() throws -> PeteKMFolder? {
     #expect(GitSupport.commitMessage(for: date, calendar: calendar) == "PeteKM backup 2026-08-19 20:45")
 }
 
-// MARK: - Git Sync (§17.2, §17.4)
+/// A bare "remote" plus two clones of it — enough to exercise real pull/push
+/// with no network (sync spec §5).
+private func makeRepositoryPair() throws -> (remote: URL, a: PeteKMFolder, b: PeteKMFolder)? {
+    guard GitSupport.isGitAvailable else { return nil }
+    let base = URL(filePath: NSTemporaryDirectory(), directoryHint: .isDirectory)
+        .appending(path: "petekm-pair-\(UUID().uuidString)", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+
+    let remote = base.appending(path: "remote.git", directoryHint: .isDirectory)
+    GitSupport.run(["init", "--bare", "--initial-branch", "main", remote.path(percentEncoded: false)], in: base)
+
+    func clone(_ name: String) -> PeteKMFolder {
+        GitSupport.run(["clone", remote.path(percentEncoded: false), name], in: base)
+        let folder = PeteKMFolder(root: base.appending(path: name, directoryHint: .isDirectory))
+        GitSupport.run(["config", "user.email", "tests@petekm.local"], in: folder.root)
+        GitSupport.run(["config", "user.name", "PeteKM Tests"], in: folder.root)
+        return folder
+    }
+
+    // Seed the remote before the second clone, so both clones track `main` the
+    // way a real second device would.
+    let a = clone("a")
+    GitSupport.run(["checkout", "-B", "main"], in: a.root)
+    try FileWriting.writeAtomically("# PeteKM", to: a.root.appending(path: "README.md"))
+    GitSupport.run(["add", "-A"], in: a.root)
+    GitSupport.run(["commit", "-m", "seed"], in: a.root)
+    GitSupport.run(["push", "--set-upstream", "origin", "main"], in: a.root)
+
+    return (remote, a, clone("b"))
+}
+
+// MARK: - Sync (sync spec §5)
 
 @Test func syncReportsMissingRepository() throws {
     let folder = try makeFolder()
@@ -50,26 +81,97 @@ private func makeRepository() throws -> PeteKMFolder? {
     guard let folder = try makeRepository() else { return }
     try FileWriting.writeAtomically("# Note", to: folder.root.appending(path: "INDEX.md"))
 
-    #expect(GitSupport.sync(folder) == .committedNotPushed(reason: .noRemote))
+    #expect(GitSupport.sync(folder) == .noRemote)
     #expect(GitSupport.run(["log", "--oneline"], in: folder.root)?.contains("PeteKM backup") == true)
 }
 
-@Test func syncReportsNothingToCommitOnACleanTree() throws {
+@Test func syncReportsNothingToSyncOnACleanTree() throws {
+    guard let pair = try makeRepositoryPair() else { return }
+    try FileWriting.writeAtomically("# Note", to: pair.a.root.appending(path: "INDEX.md"))
+    #expect(GitSupport.sync(pair.a) == .synced)
+
+    #expect(GitSupport.sync(pair.a) == .nothingToSync)
+}
+
+@Test func syncPushesToTheRemote() throws {
+    guard let pair = try makeRepositoryPair() else { return }
+    try FileWriting.writeAtomically("# Note", to: pair.a.root.appending(path: "INDEX.md"))
+
+    #expect(GitSupport.sync(pair.a) == .synced)
+    #expect(GitSupport.run(["log", "--oneline", "main"], in: pair.remote)?.contains("PeteKM backup") == true)
+}
+
+@Test func syncPullsTheOtherDevicesWorkWhileCommittingItsOwn() throws {
+    guard let pair = try makeRepositoryPair() else { return }
+    try FileWriting.writeAtomically("# From A", to: pair.a.root.appending(path: "a.md"))
+    #expect(GitSupport.sync(pair.a) == .synced)
+
+    try FileWriting.writeAtomically("# From B", to: pair.b.root.appending(path: "b.md"))
+    #expect(GitSupport.sync(pair.b) == .synced)
+
+    #expect(FileManager.default.fileExists(atPath: pair.b.root.appending(path: "a.md").path(percentEncoded: false)))
+    #expect(FileManager.default.fileExists(atPath: pair.b.root.appending(path: "b.md").path(percentEncoded: false)))
+}
+
+/// The important one: the same line edited on two devices leaves the working tree
+/// byte-identical and no rebase in progress (§5.2, §6.4).
+@Test func syncAbortsAndRestoresOnAConflict() throws {
+    guard let pair = try makeRepositoryPair() else { return }
+    let name = "note.md"
+    try FileWriting.writeAtomically("shared", to: pair.a.root.appending(path: name))
+    #expect(GitSupport.sync(pair.a) == .synced)
+    #expect(GitSupport.sync(pair.b) == .synced)
+
+    try FileWriting.writeAtomically("edited on A", to: pair.a.root.appending(path: name))
+    #expect(GitSupport.sync(pair.a) == .synced)
+
+    let bFile = pair.b.root.appending(path: name)
+    try FileWriting.writeAtomically("edited on B", to: bFile)
+    let before = try Data(contentsOf: bFile)
+
+    #expect(GitSupport.sync(pair.b) == .pullConflict)
+    #expect(try Data(contentsOf: bFile) == before)
+    #expect(!FileManager.default.fileExists(
+        atPath: pair.b.root.appending(path: ".git/rebase-merge", directoryHint: .isDirectory).path(percentEncoded: false)))
+    #expect(!FileManager.default.fileExists(
+        atPath: pair.b.root.appending(path: ".git/rebase-apply", directoryHint: .isDirectory).path(percentEncoded: false)))
+}
+
+/// A vanished remote fails at `fetch`, before push — so the outcome is `.offline`,
+/// and either way the local commit stands (§6.5).
+@Test func syncKeepsTheLocalCommitWhenTheRemoteIsUnreachable() throws {
+    guard let pair = try makeRepositoryPair() else { return }
+    try FileWriting.writeAtomically("# Note", to: pair.a.root.appending(path: "INDEX.md"))
+    #expect(GitSupport.sync(pair.a) == .synced)
+
+    // The remote disappears; the commit must still land locally (§6.5).
+    try FileManager.default.removeItem(at: pair.remote)
+    try FileWriting.writeAtomically("# More", to: pair.a.root.appending(path: "INDEX.md"))
+
+    #expect(GitSupport.sync(pair.a) == .offline)
+    #expect(GitSupport.run(["log", "--oneline"], in: pair.a.root)?.contains("PeteKM backup") == true)
+}
+
+// MARK: - aheadBehind (sync spec §5.1)
+
+@Test func aheadBehindIsNilWithoutAnUpstream() throws {
     guard let folder = try makeRepository() else { return }
     try FileWriting.writeAtomically("# Note", to: folder.root.appending(path: "INDEX.md"))
     _ = GitSupport.sync(folder)
 
-    #expect(GitSupport.sync(folder) == .nothingToCommit)
+    #expect(GitSupport.aheadBehind(folder) == nil)
 }
 
-@Test func syncKeepsTheLocalCommitWhenPushFails() throws {
-    guard let folder = try makeRepository() else { return }
-    // A remote that cannot exist: the commit must still land (§17.4).
-    GitSupport.run(["remote", "add", "origin", "/nonexistent/petekm-remote.git"], in: folder.root)
-    try FileWriting.writeAtomically("# Note", to: folder.root.appending(path: "INDEX.md"))
+@Test func aheadBehindCountsDivergence() throws {
+    guard let pair = try makeRepositoryPair() else { return }
+    try FileWriting.writeAtomically("# Note", to: pair.a.root.appending(path: "INDEX.md"))
+    #expect(GitSupport.sync(pair.a) == .synced)
+    #expect(GitSupport.aheadBehind(pair.a)! == (ahead: 0, behind: 0))
 
-    #expect(GitSupport.sync(folder) == .committedNotPushed(reason: .pushFailed))
-    #expect(GitSupport.run(["log", "--oneline"], in: folder.root)?.contains("PeteKM backup") == true)
+    try FileWriting.writeAtomically("# Local only", to: pair.a.root.appending(path: "local.md"))
+    GitSupport.run(["add", "-A"], in: pair.a.root)
+    GitSupport.run(["commit", "-m", "local"], in: pair.a.root)
+    #expect(GitSupport.aheadBehind(pair.a)! == (ahead: 1, behind: 0))
 }
 
 @Test func remoteNameIsNilWithoutARemote() throws {
@@ -83,12 +185,18 @@ private func makeRepository() throws -> PeteKMFolder? {
 // MARK: - Notice copy (DESIGN §32)
 
 @Test func syncNoticesStayTerseAndBlameless() {
-    #expect(GitSupport.SyncOutcome.pushed.notice == "Committed and pushed.")
-    #expect(GitSupport.SyncOutcome.committedNotPushed(reason: .pushFailed).notice
-            == "Committed locally. Push failed — resolve in a Git tool.")
-    for outcome: GitSupport.SyncOutcome in [.gitUnavailable, .notARepository, .nothingToCommit, .commitFailed] {
-        #expect(!outcome.notice.contains("Sorry"))
-        #expect(!outcome.notice.contains("!"))
+    #expect(GitSupport.SyncOutcome.synced.notice(editorName: "Stub Editor") == "Synced.")
+    #expect(GitSupport.SyncOutcome.nothingToSync.notice(editorName: "Stub Editor") == "Already up to date.")
+    #expect(GitSupport.SyncOutcome.noRemote.notice(editorName: "Stub Editor") == "Saved locally. No GitHub remote is set.")
+    // The conflict notice names the configured editor, never a hard-coded one (§5.4).
+    #expect(GitSupport.SyncOutcome.pullConflict.notice(editorName: "Stub Editor").contains("Stub Editor"))
+    #expect(!GitSupport.SyncOutcome.pullConflict.notice(editorName: "Stub Editor").contains("VS Code"))
+
+    for outcome: GitSupport.SyncOutcome in [.gitUnavailable, .notARepository, .offline, .noRemote,
+                                            .pullConflict, .pushFailed, .nothingToSync, .synced] {
+        let notice = outcome.notice(editorName: "Stub Editor")
+        #expect(!notice.contains("Sorry"))
+        #expect(!notice.contains("!"))
     }
 }
 

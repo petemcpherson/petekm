@@ -3,7 +3,7 @@
 //  PeteKM
 //
 //  The command catalog (spec §10.2, DESIGN §12). Commands are absent rather
-//  than dead, so the palette never shows something that cannot happen: Git Sync
+//  than dead, so the palette never shows something that cannot happen: Sync
 //  appears only in a repository, the VS Code commands only when VS Code exists.
 //
 
@@ -43,7 +43,7 @@ enum PaletteCommandID: String, CaseIterable, Identifiable {
         case .reviewInbox: return "Review Inbox"
         case .openTerminal: return "Open Terminal in PeteKM Folder"
         case .revealFolderInFinder: return "Reveal PeteKM Folder in Finder"
-        case .gitSync: return "Git Sync"
+        case .gitSync: return "Sync"
         case .settings: return "Settings"
         }
     }
@@ -69,7 +69,7 @@ enum PaletteCommandID: String, CaseIterable, Identifiable {
         case .reviewInbox: return "Open INBOX.md — items the filing agent could not place."
         case .openTerminal: return "Open Terminal at the folder root. Run your AI agent from there to file notes."
         case .revealFolderInFinder: return "Show the PeteKM folder in Finder."
-        case .gitSync: return "Commit everything and push. Never pulls or merges."
+        case .gitSync: return "Save, then sync with GitHub."
         case .settings: return "Folder, shortcut, editor, and update preferences."
         }
     }

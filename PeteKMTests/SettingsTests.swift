@@ -223,7 +223,7 @@ private func freshDefaults() -> UserDefaults {
     let copy = DailyStartBehavior.allCases.map { "\($0.title) \($0.detail)" }.joined(separator: " ")
         + " " + FolderInitializer.Report().summary
         + " " + UpdateController.unavailableNotice
-        + " " + GitSupport.SyncOutcome.committedNotPushed(reason: .pushFailed).notice
+        + " " + GitSupport.SyncOutcome.pushFailed.notice(editorName: "Stub Editor")
 
     let banned = ["journal", "entry", "vault", "knowledge base", "AI Assistant",
                   "streak", "productivity", "Great job", "🎉"]

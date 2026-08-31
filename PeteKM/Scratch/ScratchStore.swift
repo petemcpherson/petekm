@@ -10,7 +10,7 @@
 //
 //    1. dot-prefixed, so `SearchIndexBuilder.scan` skips it (never searched, never in
 //       Open Library File…, never in the table of contents);
-//    2. listed in `.gitignore`, so `Git Sync` never commits or pushes it;
+//    2. listed in `.gitignore`, so `Sync` never commits or pushes it;
 //    3. outside `daily/` and `library/`, the only folders the agent is pointed at;
 //    4. named as off-limits in the `CLAUDE.md` and `AGENTS.md` the app writes.
 //

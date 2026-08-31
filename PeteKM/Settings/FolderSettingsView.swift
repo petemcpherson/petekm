@@ -160,6 +160,7 @@ private struct GitSettingsSection: View {
     @State private var remote: String?
     @State private var status: String?
     @State private var isWorking = false
+    @State private var remoteURL = ""
 
     var body: some View {
         Section("Git") {
@@ -171,9 +172,14 @@ private struct GitSettingsSection: View {
                 Text(remote.map { "Remote: \($0)" } ?? "No Git remote set.")
                     .font(DS.Text.caption)
                     .foregroundStyle(DS.Color.textSecondary)
-                Button("Git Sync") { sync() }
+                if remote == nil {
+                    TextField("GitHub URL", text: $remoteURL)
+                    Button("Set Remote") { setRemote() }
+                        .disabled(isWorking || remoteURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                Button("Sync") { sync() }
                     .disabled(isWorking)
-                Text("Commits everything, then pushes. PeteKM never pulls, merges, or rebases.")
+                Text("Saves your notes, then syncs with GitHub. Never overwrites anything — if the same note changed on two devices, it stops and tells you.")
                     .font(DS.Text.caption)
                     .foregroundStyle(DS.Color.textSecondary)
             } else {
@@ -211,14 +217,30 @@ private struct GitSettingsSection: View {
         }
     }
 
+    private func setRemote() {
+        isWorking = true
+        let folder = folder
+        let url = remoteURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        Task {
+            let ok = await Task.detached(priority: .utility) {
+                GitSupport.setRemote(url, in: folder)
+            }.value
+            status = ok ? nil : "Couldn't add that remote — check the URL."
+            if ok { remoteURL = "" }
+            isWorking = false
+            refresh()
+        }
+    }
+
     private func sync() {
         isWorking = true
         let folder = folder
+        let editorName = ExternalEditorProvider.current.displayName
         Task {
             let outcome = await Task.detached(priority: .utility) {
                 GitSupport.sync(folder)
             }.value
-            status = outcome.notice
+            status = outcome.notice(editorName: editorName)
             isWorking = false
             refresh()
         }

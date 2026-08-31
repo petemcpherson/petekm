@@ -95,7 +95,7 @@ Targets: `PeteKM` (app), `PeteKMTests` (**Swift Testing** — `@Test`/`#expect`)
 | `FolderInitializer.swift` | Creates the folder shape. `ExistingFilePolicy = .keep` (onboarding — never overwrite) or `.backUpThenReplace` (Refresh Agent Files, §6.5). Returns a `Report` (created/kept/backedUp/failed) with a terse `summary`. |
 | `AgentTemplates.swift` | ~450L of template strings the app writes into a user's folder: `INDEX.md`, `CLAUDE.md`, `AGENTS.md`, `.gitignore`, state, and 5 skills. **Editing these is a product-content change, not an app change.** |
 | `DirectoryWatcher.swift` | FSEvents/DispatchSource watcher; drives external-change detection and index refresh. |
-| `GitSupport.swift` | Shells out to `git`. One-way only: commit + push, never pull/merge/rebase (§17.2). `SyncOutcome` enum where every case is survivable, each with a plain `notice` string. |
+| `GitSupport.swift` | Shells out to `git`. Two-way Sync: commit → fetch → pull --rebase when behind → push (`context/sync/spec.md` §5.1). Never force-pushes; a conflicting rebase is aborted and reported. `SyncOutcome` enum where every case is survivable, each with a plain `notice(editorName:)` string. |
 
 ### Generated folder shape
 
@@ -140,7 +140,7 @@ daily/library contract. Not a note, and never becomes one.
 
 1. Dot-prefixed → `SearchIndexBuilder.scan` skips it (`SearchIndex.swift`) → never searched,
    never in Open Library File…, never in the TOC.
-2. In `.gitignore` (with `.petekm-backups/`) → `Git Sync` never commits it. Folders created before the
+2. In `.gitignore` (with `.petekm-backups/`) → `Sync` never commits it. Folders created before the
    feature are repaired by `FolderInitializer.ensureScratchIgnored` on window open.
 3. Outside `daily/` and `library/` → outside every path the agent is pointed at.
 4. Named as off-limits in the `CLAUDE.md` and `AGENTS.md` templates (`AgentTemplates.swift`).
@@ -176,7 +176,7 @@ Custom `NSTextView`, not `TextEditor`. Syntax markers stay on screen.
 `Search All PeteKM…` · `Open Library File…` · `Open Library Index` ·
 `Open Library in <editor>` · `Open PeteKM Folder in <editor>` ·
 `Open Current File in <editor>` · `Review Inbox` · `Open Terminal in PeteKM Folder` ·
-`Reveal PeteKM Folder in Finder` · `Git Sync` · `Settings`
+`Reveal PeteKM Folder in Finder` · `Sync` · `Settings`
 
 ## Layer 6 — External tools (`PeteKM/External/`)
 

@@ -1586,6 +1586,10 @@ The app does not need to reproduce the second experience inside its own search U
 
 # 17. Git and Version History
 
+> **Superseded in full by `context/sync/spec.md`.** Sync is now two-way (commit →
+> fetch → pull --rebase → push) and the user-facing name is **Sync**, not Git Sync.
+> Where this section and the sync spec disagree, the sync spec wins.
+
 Git is strongly aligned with the product philosophy.
 
 It provides:

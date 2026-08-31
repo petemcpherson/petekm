@@ -74,7 +74,7 @@ struct GuideSettingsView: View {
                 GuideSection("7. Scratch") {
                     GuideLine("The pane under the editor is Scratch. It holds the same text every day, no matter which file is open. Nothing carries it forward — there is only ever one of it.")
                     GuideLine("It is for what you don't want kept: a to-do list for the next few days, a phone number for this afternoon, a key you pasted once and will delete.")
-                    GuideLine("The agent is told never to read it, quote it, or file it. It's excluded from search, and it's listed in `.gitignore`, so Git Sync never sends it anywhere.")
+                    GuideLine("The agent is told never to read it, quote it, or file it. It's excluded from search, and it's listed in `.gitignore`, so Sync never sends it anywhere.")
                     GuideLine("⌘⇧S shows and hides it. Drag its top edge to resize. It empties only when you clear it — the cleared text is kept as a `.bak` file in `.petekm-backups/`.")
                     GuideLine("It is plain text on disk, not encrypted. Nothing about it is private from anyone who can read your folder.")
                 }
@@ -82,7 +82,7 @@ struct GuideSettingsView: View {
                 GuideSection("8. Things worth trusting") {
                     GuideLine("The `.md` files are the whole product. Indexes, caches, and `.petekm-state.json` are disposable and rebuildable.")
                     GuideLine("PeteKM is not the only writer. Edit the same files in \(PaletteCommandID.editorName) or Finder; external changes are detected rather than clobbered.")
-                    GuideLine("Capture never blocks. A failed Git Sync, a missing editor, or an agent that isn't installed can't stop you from opening or saving today.")
+                    GuideLine("Capture never blocks. A failed Sync, a missing editor, or an agent that isn't installed can't stop you from opening or saving today.")
                     GuideLine("Your edits win. The agent treats what's on disk as authoritative.")
                 }
             }
