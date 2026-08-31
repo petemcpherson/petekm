@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let root = RootView()
             .environment(services.folderStore)
             .environment(services.settings)
+            .environment(services.syncLaunchCheck)
 
         let controller = StickyWindowController(content: root)
         windowController = controller

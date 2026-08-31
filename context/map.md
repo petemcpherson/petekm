@@ -95,7 +95,8 @@ Targets: `PeteKM` (app), `PeteKMTests` (**Swift Testing** — `@Test`/`#expect`)
 | `FolderInitializer.swift` | Creates the folder shape. `ExistingFilePolicy = .keep` (onboarding — never overwrite) or `.backUpThenReplace` (Refresh Agent Files, §6.5). Returns a `Report` (created/kept/backedUp/failed) with a terse `summary`. |
 | `AgentTemplates.swift` | ~450L of template strings the app writes into a user's folder: `INDEX.md`, `CLAUDE.md`, `AGENTS.md`, `.gitignore`, state, and 5 skills. **Editing these is a product-content change, not an app change.** |
 | `DirectoryWatcher.swift` | FSEvents/DispatchSource watcher; drives external-change detection and index refresh. |
-| `GitSupport.swift` | Shells out to `git`. Two-way Sync: commit → fetch → pull --rebase when behind → push (`context/sync/spec.md` §5.1). Never force-pushes; a conflicting rebase is aborted and reported. `SyncOutcome` enum where every case is survivable, each with a plain `notice(editorName:)` string. |
+| `GitSupport.swift` | Shells out to `git`. Two-way Sync: commit → fetch → pull --rebase when behind → push (`context/sync/spec.md` §5.1). Never force-pushes; a conflicting rebase is aborted and reported. `SyncOutcome` enum where every case is survivable, each with a plain `notice(editorName:)` string. `aheadBehind(_:)` parses `rev-list --left-right --count` and returns nil without an upstream. |
+| `SyncLaunchCheck.swift` | `@Observable`, once per app process: fetch, compare with `aheadBehind`, and show the dismissible "Changes to sync." banner only when `ahead > 0 || behind > 0`. Every failure — no git, not a repository, no upstream, unreachable remote — is silent (`context/sync/spec.md` §4.3). |
 
 ### Generated folder shape
 

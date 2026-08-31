@@ -8,6 +8,9 @@ final class AppServices {
     let folderStore: FolderStore
     let settings: AppSettings
 
+    /// Once-per-process "Changes to sync." check (sync spec §4.3).
+    let syncLaunchCheck = SyncLaunchCheck()
+
     /// UI tests set this to a scratch folder so the capture loop can be driven
     /// without onboarding and without touching the real PeteKM folder.
     static let uiTestFolderKey = "PETEKM_UITEST_FOLDER"

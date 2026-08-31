@@ -5,6 +5,7 @@ import AppKit
 struct DailyStickyView: View {
     @Environment(FolderStore.self) private var folderStore
     @Environment(AppSettings.self) private var settings
+    @Environment(SyncLaunchCheck.self) private var syncLaunchCheck
 
     let folder: PeteKMFolder
 
@@ -42,6 +43,7 @@ struct DailyStickyView: View {
         VStack(spacing: 0) {
             header(session)
             Divider()
+            syncBanner(session)
             editor(session)
             scratchPane
         }
@@ -64,6 +66,7 @@ struct DailyStickyView: View {
             installPaletteShortcut()
             noticeIfAgentFilesOutOfDate()
             prepareScratch()
+            syncLaunchCheck.runIfNeeded(folder: folder)
         }
         .onDisappear {
             removePaletteShortcut()
@@ -92,6 +95,35 @@ struct DailyStickyView: View {
         .onDisappear {
             session.flush()
             scratch?.flush()
+        }
+    }
+
+    // MARK: - Sync banner (sync spec §4.3)
+
+    /// One non-modal, dismissible row. No counts, no ahead/behind, no Git words.
+    @ViewBuilder
+    private func syncBanner(_ session: DailySession) -> some View {
+        if syncLaunchCheck.showsBanner {
+            HStack(spacing: DS.Space.s4) {
+                Text("Changes to sync.")
+                    .font(DS.Text.caption)
+                    .foregroundStyle(DS.Color.textSecondary)
+                Spacer(minLength: 0)
+                Button("Sync") {
+                    syncLaunchCheck.dismiss()
+                    gitSync(session: session)
+                }
+                Button {
+                    syncLaunchCheck.dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                }
+                .buttonStyle(.borderless)
+                .help("Dismiss")
+            }
+            .padding(.horizontal, DS.Space.s6)
+            .padding(.vertical, DS.Space.s4)
+            Divider()
         }
     }
 
@@ -213,7 +245,7 @@ struct DailyStickyView: View {
             }
 
         case .gitSync:
-            gitSync()
+            gitSync(session: session)
         }
 
         editorController.focusEditor()
@@ -231,12 +263,17 @@ struct DailyStickyView: View {
 
     /// Git runs off the main actor and only ever reports back with a line of
     /// text — capture never waits on it (§17.4).
-    private func gitSync() {
+    private func gitSync(session: DailySession) {
         let folder = folder
         Task {
             let outcome = await Task.detached(priority: .utility) {
                 GitSupport.sync(folder)
             }.value
+            // A successful sync may have pulled a new version of the open file;
+            // notice it now rather than at the next activation (sync spec §5.5).
+            if outcome == .synced {
+                session.document?.reconcileWithDisk()
+            }
             // A conflict asks something of the user; give it the longer notice.
             show(outcome.notice(editorName: ExternalEditorProvider.current.displayName),
                  seconds: outcome == .pullConflict ? 15 : 6)

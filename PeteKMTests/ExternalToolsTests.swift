@@ -259,3 +259,58 @@ private struct StubEditor: ExternalEditor {
     _ = editor.isAvailable
     #expect(editor.unavailableNotice == "PeteKM couldn't open VS Code.")
 }
+
+// MARK: - Ahead/behind, the behind half (sync spec §4.3)
+
+@Test func aheadBehindCountsWorkWaitingOnTheRemote() throws {
+    guard let pair = try makeRepositoryPair() else { return }
+
+    // One local commit in B: ahead only.
+    try FileWriting.writeAtomically("b", to: pair.b.root.appending(path: "b.md"))
+    GitSupport.run(["add", "-A"], in: pair.b.root)
+    GitSupport.run(["commit", "-m", "b"], in: pair.b.root)
+    var counts = GitSupport.aheadBehind(pair.b)
+    #expect(counts?.ahead == 1)
+    #expect(counts?.behind == 0)
+
+    // A publishes a commit; after B fetches it is behind as well.
+    try FileWriting.writeAtomically("a", to: pair.a.root.appending(path: "a.md"))
+    GitSupport.run(["add", "-A"], in: pair.a.root)
+    GitSupport.run(["commit", "-m", "a"], in: pair.a.root)
+    GitSupport.run(["push"], in: pair.a.root)
+
+    GitSupport.run(["fetch"], in: pair.b.root)
+    counts = GitSupport.aheadBehind(pair.b)
+    #expect(counts?.ahead == 1)
+    #expect(counts?.behind == 1)
+}
+
+// MARK: - Launch check (sync spec §4.3)
+
+@Test func launchCheckPromptsOnlyWhenTheDeviceHasDrifted() {
+    // Silent for everything the check can't answer: no git, not a repository,
+    // no upstream, unreachable remote all arrive here as nil.
+    #expect(SyncLaunchCheck.shouldPrompt(aheadBehind: nil) == false)
+    #expect(SyncLaunchCheck.shouldPrompt(aheadBehind: (ahead: 0, behind: 0)) == false)
+    #expect(SyncLaunchCheck.shouldPrompt(aheadBehind: (ahead: 2, behind: 0)))
+    #expect(SyncLaunchCheck.shouldPrompt(aheadBehind: (ahead: 0, behind: 3)))
+    #expect(SyncLaunchCheck.shouldPrompt(aheadBehind: (ahead: 1, behind: 1)))
+}
+
+@MainActor
+@Test func launchCheckRunsOncePerProcess() throws {
+    let folder = try makeFolder()
+    let check = SyncLaunchCheck()
+    #expect(check.hasRun == false)
+
+    check.runIfNeeded(folder: folder)
+    #expect(check.hasRun)
+
+    // A re-summon rebuilds the view; the flag must not reset.
+    check.runIfNeeded(folder: folder)
+    #expect(check.hasRun)
+
+    // Not a repository: nothing to show, and dismissing stays dismissed.
+    check.dismiss()
+    #expect(check.showsBanner == false)
+}

@@ -106,6 +106,18 @@ never invokes, monitors, or parses an agent.
   Sticky still works. Sync only ever reports a notice.
 - **Commit precedes every network call (§6.1)** — `GitSupport.sync` commits before
   `fetch`; a failed commit returns before any network step.
+- **A pulled change reaches the conflict alert (§5.5)** — manual: with today's sticky
+  open and dirty, Sync a pull that rewrites that same file; the Keep Both / Keep Mine /
+  Keep Disk alert appears. Three paths cover it, none of which cares who wrote the file:
+  `DailySession`'s `DirectoryWatcher` on `daily/` (and on an open Library file's
+  directory), `handleActivation()` on `didBecomeActive`, and — added here — a
+  `reconcileWithDisk()` fired from `gitSync` the moment the outcome is `.synced`, so the
+  alert doesn't wait for the next activation. Document-level behaviour is covered by
+  `StickyDocumentTests`' conflict tests.
+- **The launch check is silent unless the device has drifted (§4.3)** —
+  `SyncLaunchCheck.shouldPrompt` in `ExternalToolsTests`: nil (no git, not a repository,
+  no upstream, unreachable remote) and `(0, 0)` show nothing; the once-per-process flag
+  does not reset when the window is rebuilt or re-summoned.
 
 ## Vocabulary audit (DESIGN §2, §39)
 
