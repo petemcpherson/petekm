@@ -13,6 +13,8 @@ real detail lives.
 | `context/spec.md` | Product behavior. Sections are cited in code comments as `§N`. | ~2200L |
 | `context/DESIGN.md` | Visuals, UX, vocabulary, copy tone. | ~1500L |
 | `context/plan.md` | 7-phase implementation plan. All phases complete. | ~210L |
+| `context/sync/spec.md` | Two-way sync + unified `/petekm-process`. **Supersedes `spec.md` §17 in full**; amends §12–§15 wherever they name `Git Sync` or the old per-date process skills. | ~260L |
+| `context/sync/plan.md` | Sync implementation plan + manual testing checklist. Implemented. | ~394L |
 | `context/ACCEPTANCE.md` | Criterion → code → test mapping (spec §24, §22). Best "does X exist?" lookup. | ~100L |
 | `context/DISTRIBUTION.md` | Signing, notarization, Sparkle, `scripts/release.sh`. | ~57L |
 | `context/design-system/` | Tokens + pixel-art mark assets (`robopete*.png/svg`, `robopete.grid.json` — internal filenames only, no user-facing name). | — |
@@ -59,7 +61,8 @@ Targets: `PeteKM` (app), `PeteKMTests` (**Swift Testing** — `@Test`/`#expect`)
 | `App/` | Lifecycle, window, global hotkey, menu bar, service container |
 | `Daily/` | Daily Sticky: date → file → document, New Day flow, main screen |
 | `Editor/` | NSTextView Markdown editor, live styling, TOC, cursor memory |
-| `Files/` | Folder shape, bookmarks, atomic writes, initialization, templates, Git, watchers |
+| `Files/` | Folder shape, bookmarks, atomic writes, initialization, templates, Git/Sync, watchers |
+| `External/` | VS Code, Finder, Terminal hand-off — every failure a notice, never a block |
 | `Onboarding/` | First run + missing-folder recovery |
 | `Palette/` | ⌘K command palette, command catalog |
 | `Scratch/` | The Scratch pane — one durable-but-unfiled file, outside the contract |
@@ -78,8 +81,8 @@ Targets: `PeteKM` (app), `PeteKMTests` (**Swift Testing** — `@Test`/`#expect`)
 | File | Role |
 | --- | --- |
 | `AppDelegate.swift` | Background-resident lifecycle. Builds `RootView`, owns window controller, hotkey monitor, menu-bar item. `applicationShouldTerminateAfterLastWindowClosed → false` (§8.7). |
-| `AppServices.swift` | `AppServices.shared` — the two long-lived stores (`FolderStore`, `AppSettings`). Honors `PETEKM_UITEST_FOLDER` env var to run against a scratch folder. |
-| `StickyWindowController.swift` | One sticky window. `summon()`, float-on-top, hide-not-close (§8.6). Posts `Notification.Name` events. |
+| `AppServices.swift` | `AppServices.shared` — the long-lived stores (`FolderStore`, `AppSettings`, `SyncLaunchCheck`). Honors `PETEKM_UITEST_FOLDER` env var to run against a scratch folder. |
+| `StickyWindowController.swift` | One sticky window. `summon()`, float-on-top, hide-not-close (§8.6). Owns the app's `Notification.Name` events, including `.peteKMSummonWindow` (Settings lives in its own window, so an action there must summon the sticky). |
 | `GlobalHotKeyMonitor.swift` + `KeyCombo.swift` | System-wide show/hide shortcut (§8.2). Needs Accessibility permission. |
 | `MenuBarController.swift` | Menu-bar item; visibility rule paired with dock-icon setting (§8.8). |
 | `ShortcutRecorder.swift` | SwiftUI key-combo recorder used in Settings. |
@@ -93,7 +96,7 @@ Targets: `PeteKM` (app), `PeteKMTests` (**Swift Testing** — `@Test`/`#expect`)
 | `FolderStore.swift` | `@Observable`. Holds active folder; persists a security-scoped bookmark in `UserDefaults`. `State = .unset / .ready(PeteKMFolder) / .missing(lastKnownPath:)` (§19.6). |
 | `FileWriting.swift` | Atomic write (temp + rename), read, exists, and `backUp(_:into:)` → `.petekm-backups/<name>.bak-YYYY-MM-DD` with a disambiguating counter (§6.5, §19.2). |
 | `FolderInitializer.swift` | Creates the folder shape. `ExistingFilePolicy = .keep` (onboarding — never overwrite) or `.backUpThenReplace` (Refresh Agent Files, §6.5). Returns a `Report` (created/kept/backedUp/failed) with a terse `summary`. |
-| `AgentTemplates.swift` | ~450L of template strings the app writes into a user's folder: `INDEX.md`, `CLAUDE.md`, `AGENTS.md`, `.gitignore`, state, and 5 skills. **Editing these is a product-content change, not an app change.** |
+| `AgentTemplates.swift` | ~480L of template strings the app writes into a user's folder: `INDEX.md`, `CLAUDE.md`, `AGENTS.md`, `.gitignore`, state, and 5 skills. **Editing these is a product-content change, not an app change.** |
 | `DirectoryWatcher.swift` | FSEvents/DispatchSource watcher; drives external-change detection and index refresh. |
 | `GitSupport.swift` | Shells out to `git`. Two-way Sync: commit → fetch → pull --rebase when behind → push (`context/sync/spec.md` §5.1). Never force-pushes; a conflicting rebase is aborted and reported. `SyncOutcome` enum where every case is survivable, each with a plain `notice(editorName:)` string. `aheadBehind(_:)` parses `rev-list --left-right --count` and returns nil without an upstream. |
 | `SyncLaunchCheck.swift` | `@Observable`, once per app process: fetch, compare with `aheadBehind`, and show the dismissible "Changes to sync." banner only when `ahead > 0 || behind > 0`. Every failure — no git, not a repository, no upstream, unreachable remote — is silent (`context/sync/spec.md` §4.3). |
@@ -112,19 +115,42 @@ INDEX.md   CLAUDE.md   AGENTS.md   INBOX.md
 .gitignore
 ```
 
+### State outside the folder
+
+Everything the app keeps outside a user's PeteKM folder. All of it is derived or
+preference data — none of it holds note content (invariant 1), and deleting any of it
+costs at most a rescan.
+
+| Location | Written by | Holds | Safe to delete |
+| --- | --- | --- | --- |
+| `UserDefaults` (`com.petekm.PeteKM`) | `AppSettings`, `FolderStore` | `petekm.*` preferences, the security-scoped folder bookmark + last known path, per-file cursor positions | Yes — resets the app to first run |
+| `~/Library/Application Support/PeteKM/SearchIndex/<digest>.json` | `SearchIndex.save` | Cached index (path/mtime/size/**text**) for one folder; `<digest>` is the first 16 hex of SHA-256 over the folder's absolute path, so each folder gets its own file and stale ones are never read | Yes — rebuilt on next scan |
+
+Two consequences worth knowing. The index cache **contains note text**, so it outlives a
+deleted notes folder until removed by hand. And because the digest is over the folder
+*path*, moving a folder silently orphans its cache rather than invalidating it.
+
+**Full reset** (quit first — the app is background-resident and rewrites its plist on exit):
+
+```bash
+osascript -e 'tell application "PeteKM" to quit'
+defaults delete com.petekm.PeteKM
+rm -rf ~/Library/Application\ Support/PeteKM
+```
+
 ## Layer 3 — Daily Sticky (`PeteKM/Daily/`)
 
 The capture loop. Read `DailySession` first.
 
 | File | Role |
 | --- | --- |
-| `DailySession.swift` | `@MainActor @Observable` orchestrator. Owns `openedDate`, the open `StickyDocument`, New Day prompt state, `openedAsToday` / `openedIsDaily` (Library files open in the same editor, §10.2), `revealRange` for search hits, and directory watching. |
+| `DailySession.swift` | `@MainActor @Observable` orchestrator. `pruneIfBlank` deletes a blank Daily Sticky on flush or on leaving it — a day written entirely in Scratch leaves no file (never a Library file, never dirty or conflicted, blank in memory *and* on disk). Owns `openedDate`, the open `StickyDocument`, New Day prompt state, `openedAsToday` / `openedIsDaily` (Library files open in the same editor, §10.2), `revealRange` for search hits, and directory watching. |
 | `StickyDocument.swift` | One open file. `text` is a working copy; `savedText` mirrors disk. Debounced (600ms) atomic autosave. `Conflict(diskText:)` + `ConflictChoice = .keepMine/.keepDisk/.keepBoth` (§8.4, §8.5, §19.3, §19.4). |
-| `DailyFiles.swift` / `DailyDate.swift` | Filename ↔ date, long-form display strings. |
+| `DailyFiles.swift` / `DailyDate.swift` | Filename ↔ date, long-form display strings. `isBlankSticky` — nothing but whitespace and, at most, that day's own heading; `mostRecentSticky` steps over blank days so carry-forward is not swallowed by a day spent only in Scratch. |
 | `NewDayComposer.swift` | `NewDayStart` = `.scratch / .carryForwardHeaders / .defaultHeaders`; builds the opening text (§7.2–7.6). |
 | `NewDayPrompt.swift` | The tiny "ask each day" prompt (§7.3). |
 | `MarkdownHeadings.swift` | Heading parse used by carry-forward. |
-| `DailyStickyView.swift` | Main screen (~300L). Wires `DailySession` + `EditorController` + `PaletteModel`, hosts the conflict alert, TOC, and the transient notice line. |
+| `DailyStickyView.swift` | Main screen. Wires `DailySession` + `EditorController` + `PaletteModel` + `ScratchStore`, paints the window background, hosts the conflict alert, TOC, the transient notice line, and the dismissible "Changes to sync." row from `SyncLaunchCheck` (no counts, no git words). |
 
 ## Layer 3b — Scratch (`PeteKM/Scratch/`)
 
@@ -166,15 +192,15 @@ Custom `NSTextView`, not `TextEditor`. Syntax markers stay on screen.
 | File | Role |
 | --- | --- |
 | `PaletteCommand.swift` | `PaletteCommandID` catalog — the canonical command list, grouped, with display titles. Editor name is looked up, never hard-coded. `PaletteOutcome` is what a command asks the host view to do. |
-| `PaletteModel.swift` | ~400L. Modes (commands / file open / search / date), row building, selection, availability gating (`isGitRepository`, `isEditorAvailable`), and `PaletteDateInput.parse` for "Open Date…". |
+| `PaletteModel.swift` | ~450L. Modes (commands / file open / insert path / search / date), row building, selection, availability gating (`isGitRepository`, `isEditorAvailable`, `isDocumentOpen`), `PaletteDateInput.parse` for "Open Date…", the `"/ "` prefix shortcut (`libraryFileShortcut`) that jumps the command list straight into file open, and `LibraryPaths.destinations` — folders (derived from indexed file paths) plus files, typed into the note as `-> library/…` via `PaletteOutcome.insertText` → `EditorController.insert`. |
 | `CommandPaletteView.swift` | The overlay UI. |
-| `SearchIndex.swift` | `@Observable`. **Disposable** in-memory index (`IndexedFile` = path/mtime/size/text). Incremental rescan off the main actor; watcher-driven with a time-based fallback for unwatched new folders. Rebuildable from disk by definition (§2.2). |
+| `SearchIndex.swift` | `@Observable`. **Disposable** index (`IndexedFile` = path/mtime/size/text). Incremental rescan off the main actor; watcher-driven with a time-based fallback for unwatched new folders. Rebuildable from disk by definition (§2.2). Cached to `~/Library/Application Support/PeteKM/SearchIndex/<sha256-prefix>.json`, keyed on the folder's path — see [State outside the folder](#state-outside-the-folder). |
 | `SearchQuery.swift` / `FuzzyMatch.swift` | Ranking + `SearchResult` (used to drive `DailySession.revealRange`), and fuzzy filename matching for file-open. |
 
 ### Command catalog (user-facing surface)
 
 `Open Daily Sticky` · `Open Previous Daily Sticky` · `Open Date…` · `Open Scratch` ·
-`Search All PeteKM…` · `Open Library File…` · `Open Library Index` ·
+`Search All PeteKM…` · `Open Library File…` · `Insert Library Path…` · `Open Library Index` ·
 `Open Library in <editor>` · `Open PeteKM Folder in <editor>` ·
 `Open Current File in <editor>` · `Review Inbox` · `Open Terminal in PeteKM Folder` ·
 `Reveal PeteKM Folder in Finder` · `Sync` · `Settings`
@@ -190,22 +216,43 @@ Custom `NSTextView`, not `TextEditor`. Syntax markers stay on screen.
 
 | File | Role |
 | --- | --- |
-| `AppSettings.swift` | `@Observable`, `UserDefaults`-backed. Keys are namespaced `petekm.*`: `dailyStartBehavior`, `defaultHeaders`, `showDateHeading`, `globalShortcut`, `hasCompletedOnboarding`, `editorFontName/Size/LineSpacing`, `showTableOfContents`, `autoClosePairs`, `continueListMarkers`, `scratchVisible`, `scratchHeight`, `floatOnTop`, `hideDockIcon`, `hideMenuBarItem`, `automaticUpdateChecks`, `backgroundHex`, `backgroundOpacity`, `textHex` (window color/transparency + editor text color, all in the Editor tab; `HexColor` parser lives here; window is non-opaque, `DailyStickyView` paints the background). **No AI settings exist, now or later (§18.8).** |
+| `AppSettings.swift` | `@Observable`, `UserDefaults`-backed. Keys are namespaced `petekm.*`: `dailyStartBehavior`, `defaultHeaders`, `showDateHeading`, `globalShortcut`, `hasCompletedOnboarding`, `editorFontName/Size/LineSpacing`, `showTableOfContents`, `autoClosePairs`, `continueListMarkers`, `scratchVisible`, `scratchHeight`, `floatOnTop`, `hideDockIcon`, `hideMenuBarItem`, `agentFilesNoticeShownFor`, `automaticUpdateChecks`, `backgroundHex`, `backgroundOpacity`, `textHex` (window color/transparency + editor text color, all in the Editor tab; `HexColor` parser lives here; window is non-opaque, `DailyStickyView` paints the background). **No AI settings exist, now or later (§18.8).** |
 | `SettingsView.swift` | Tabs: General, Daily Sticky (incl. Scratch), Editor (+ Folder, Guide, Updates panes). |
-| `FolderSettingsView.swift` | Change folder, Refresh Agent Files, Git init/status. |
-| `GuideSettingsView.swift` | In-app explanation of the daily/library contract. |
+| `FolderSettingsView.swift` | Change folder, Refresh Agent Files, Git: Initialize Repository / Set Remote / Sync (§18.9). |
+| `GuideSettingsView.swift` | In-app explanation of the daily/library contract, plus **Show Onboarding Again** (see Layer 8). |
 | `UpdateController.swift` | All Sparkle code behind `#if canImport(Sparkle)`. Reads `SUFeedURL`; inert without it. Never auto-installs. |
+| `UpdateSettingsView.swift` | The Updates pane — check-now button and the automatic-checks toggle. |
 
 ## Layer 8 — Onboarding (`PeteKM/Onboarding/`)
 
-`OnboardingModel` + `OnboardingView` (§6): pick or create a folder, initialize it with
-`.keep` policy (existing files are never overwritten), set the daily-start behavior.
-`MissingFolderView` handles `FolderStore.State.missing` — relocate or re-pick (§19.6).
+`OnboardingModel` + `OnboardingView` (§6). Seven steps: `.welcome` → `.chooseFolder` →
+`.structure` → `.dailyPreference` → `.claudeCode` → `.skills` → `.setUpLibrary`. Pick or create a
+folder, initialize it with `.keep` policy (existing files are never overwritten), set the
+daily-start behavior. `MissingFolderView` handles `FolderStore.State.missing` — relocate
+or re-pick (§19.6).
+
+`.skills` is the one place the four `/petekm-*` commands are explained before the
+folder is handed over — what each does and when to reach for it. It runs nothing; the
+skills live in the user's folder and are typed to their agent in a terminal.
+
+`.setUpLibrary` is the last step and writes nothing. It is the one place the app talks
+about Library *shape*: build the folders you think in (PARA named only as an example,
+never created), copy existing Markdown into `library/` rather than `daily/`, and run
+`/petekm-rebuild-index` afterwards. **The app imposes no folder system** — `library/`
+starts empty and only the user or their agent shapes it. Three hand-off buttons reuse
+`ExternalTools` and `ExternalEditorProvider.current`; each failure sets `toolNotice` and
+nothing blocks (§15.3).
+
+Replayable: Settings → Guide → **Show Onboarding Again** sets
+`hasCompletedOnboarding = false` and posts `.peteKMSummonWindow`. `RootView` drops the
+finished model on that change so the flow restarts at `.welcome`, and the folder step
+offers **Keep using this folder** (`keepCurrentFolder()`, same `.keep` adoption) when a
+folder is already set — otherwise the replay dead-ends there.
 
 ## Design system (`PeteKM/DesignSystem/`)
 
-`DS.swift` — `DS.Color` (light/dark dynamic pairs), `DS.Font` (system faces, 10–28pt),
-spacing/radius tokens. `PixelMark.swift` — pixel-art mark + wordmark (asset files
+`DS.swift` — `DS.Color` (light/dark dynamic pairs), `DS.Text` (system faces, 10–28pt),
+`DS.Space` / `DS.Radius` / `DS.Duration`. `PixelMark.swift` — pixel-art mark + wordmark (asset files
 internally named `robopete*`), the only custom branding (DESIGN §3, §6). Prefer native
 controls over custom chrome.
 
@@ -246,6 +293,6 @@ controls over custom chrome.
 
 ## Known drift
 
-`CLAUDE.md` still describes the repo as "the stock Xcode SwiftUI+SwiftData template".
-That is stale — all 7 plan phases are complete and SwiftData is gone. Trust this map
-and the code over that sentence.
+`context/spec.md` §17 (Git and Version History) is superseded in full by
+`context/sync/spec.md` — §17 still describes a push-only `Git Sync`. Trust the sync spec
+and the code.

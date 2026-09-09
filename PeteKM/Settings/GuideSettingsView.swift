@@ -86,6 +86,8 @@ struct GuideSettingsView: View {
                     GuideLine("Capture never blocks. A failed Sync, a missing editor, or an agent that isn't installed can't stop you from opening or saving today.")
                     GuideLine("Your edits win. The agent treats what's on disk as authoritative.")
                 }
+
+                GuideReplayOnboarding()
             }
             .padding(DS.Space.s7)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -95,6 +97,27 @@ struct GuideSettingsView: View {
 }
 
 // MARK: - Pieces
+
+/// Replays the first-run flow on demand (§6). Nothing on disk changes: onboarding
+/// adopts a folder with `.keep`, so existing files are never overwritten — this only
+/// walks the same steps again — including the last one, which is the reminder to
+/// shape `library/` and import existing notes.
+private struct GuideReplayOnboarding: View {
+
+    @Environment(AppSettings.self) private var settings
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DS.Space.s3) {
+            Button("Show Onboarding Again") {
+                settings.hasCompletedOnboarding = false
+                NotificationCenter.default.post(name: .peteKMSummonWindow, object: nil)
+            }
+            Text("Walks through the setup steps again in the main window, ending with the suggestions for shaping your Library and importing notes. Your folder and notes aren't touched.")
+                .font(DS.Text.caption)
+                .foregroundStyle(DS.Color.textSecondary)
+        }
+    }
+}
 
 private struct GuideIntro: View {
     var body: some View {

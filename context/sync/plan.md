@@ -1,5 +1,49 @@
 # Implementation Plan: Multi-Device Sync + Unified Process
 
+## Testing checklist (manual — automated coverage is green)
+
+**Setup**
+
+- [ ] In each existing PeteKM folder, open Settings → **Refresh Agent Files**. Confirm
+      `.claude/skills/petekm-process/SKILL.md` exists, `petekm-process-today/` and
+      `petekm-process-date/` are gone, and both old SKILL.md files sit in `.petekm-backups/`.
+- [ ] If no remote: Settings → Git → paste GitHub URL → **Set Remote**. Use an SSH URL or
+      have `gh`/a credential helper configured — the app runs `git` with no terminal, so a
+      password-prompting HTTPS remote just reports "couldn't publish to GitHub".
+- [ ] Second device: clone the repo, point the app at the clone.
+
+**Sync**
+
+- [ ] Clean tree → Sync → "Already up to date."
+- [ ] Edit on device A, Sync; on B, Sync → A's change arrives, B's own edit is committed too.
+- [ ] Same line edited on both → B's Sync says "Sync paused — the same note changed on two
+      devices." B's file is unchanged; `git status` shows no rebase in progress.
+- [ ] Push with the remote unreachable → "Saved and up to date locally, but couldn't publish."
+
+**Launch banner**
+
+- [ ] Push from A, relaunch B → "Changes to sync." row appears. Sync button clears it.
+- [ ] Dismiss with ×, re-summon the window → stays gone.
+- [ ] No remote / no network → no banner, no error.
+
+**Conflict alert (§5.5)**
+
+- [ ] Today's sticky open and dirty; Sync pulls a rewrite of that same file → Keep Mine /
+      Keep Disk / Keep Both alert appears immediately, not on next activation.
+
+**Capture never blocks (§6.6)**
+
+- [ ] With `git` off `PATH`, offline, and right after a paused sync: open and save today's
+      Daily Sticky.
+
+**Agent**
+
+- [ ] `/petekm-process` with no argument processes every unprocessed day, oldest-first, and
+      commits + pushes at the end. `/petekm-process 2026-08-11` does that one day only.
+- [ ] `/petekm-status` shows the ahead/behind line.
+
+---
+
 Source spec: `context/sync/spec.md` (final, no open decisions). Section refs below (`§N`)
 are that spec unless marked `main spec §N` (= `context/spec.md`).
 

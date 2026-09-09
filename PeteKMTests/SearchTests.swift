@@ -202,3 +202,63 @@ private func indexedFile(_ path: String, _ text: String, modified: Date = Date()
     #expect(stamp("rutabaga") == nil)
     #expect(stamp("19/45") == nil)
 }
+
+@Test func libraryDestinationsCoverEveryFolderAndFile() {
+    let paths = [
+        "library/Work/Acme.md",
+        "library/Work/Projects/MFT.md",
+        "library/Lists/Gifts.md",
+    ]
+    let destinations = LibraryPaths.destinations(from: paths)
+
+    // Folders first, each with a trailing slash, `library/` itself included.
+    #expect(destinations.prefix(5) == [
+        "library/",
+        "library/Lists/",
+        "library/Work/",
+        "library/Work/Projects/",
+        "library/Lists/Gifts.md",
+    ])
+    #expect(destinations.filter { $0.hasSuffix("/") }.count == 4)
+    #expect(destinations.count == 7)
+    // Every inserted path is agent-recognizable: it starts with `library/`.
+    #expect(destinations.allSatisfy { $0.hasPrefix("library/") })
+}
+
+@Test func libraryDestinationsOfAnEmptyLibraryAreJustTheRoot() {
+    #expect(LibraryPaths.destinations(from: []) == ["library/"])
+}
+
+@Test func insertedPathCarriesTheArrowHint() {
+    #expect(PaletteModel.destinationHintPrefix + "library/Work/" == "-> library/Work/")
+}
+
+@Test func slashSpaceIsTheOnlyShapeThatTriggersTheFileShortcut() {
+    #expect(PaletteModel.libraryFileShortcut("/ acme") == "acme")
+    #expect(PaletteModel.libraryFileShortcut("/ ") == "")
+    #expect(PaletteModel.libraryFileShortcut("/acme") == nil)
+    #expect(PaletteModel.libraryFileShortcut("acme") == nil)
+    #expect(PaletteModel.libraryFileShortcut(" / acme") == nil)
+}
+
+@MainActor
+@Test func typingSlashSpaceInTheCommandListJumpsToFileOpen() {
+    let palette = PaletteModel()
+    palette.present()
+
+    palette.query = "/ "
+    #expect(palette.mode == .files)
+    #expect(palette.query == "")
+
+    palette.query = "acme"
+    #expect(palette.mode == .files)
+    // Already in file mode: the prefix is literal text, not a second jump.
+    palette.query = "/ acme"
+    #expect(palette.mode == .files)
+    #expect(palette.query == "/ acme")
+
+    // Escape steps back to the command list with a clean query (§10.1).
+    palette.back()
+    #expect(palette.mode == .commands)
+    #expect(palette.query == "")
+}

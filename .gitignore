@@ -1,0 +1,26 @@
+# macOS
+.DS_Store
+
+# Xcode — build output & per-user state
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Per-machine signing identity (see Config/Shared.xcconfig)
+Config/Local.xcconfig
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/
+Package.resolved
+
+# Playgrounds
+timeline.xctimeline
+playground.xcworkspace

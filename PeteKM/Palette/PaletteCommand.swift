@@ -16,6 +16,7 @@ enum PaletteCommandID: String, CaseIterable, Identifiable {
     case openScratch
     case searchAllPeteKM
     case openLibraryFile
+    case insertLibraryPath
     case openLibraryIndex
     case openLibraryInEditor
     case openFolderInEditor
@@ -36,6 +37,7 @@ enum PaletteCommandID: String, CaseIterable, Identifiable {
         case .openScratch: return "Open Scratch"
         case .searchAllPeteKM: return "Search All PeteKM…"
         case .openLibraryFile: return "Open Library File…"
+        case .insertLibraryPath: return "Insert Library Path…"
         case .openLibraryIndex: return "Open Library Index"
         case .openLibraryInEditor: return "Open Library in \(PaletteCommandID.editorName)"
         case .openFolderInEditor: return "Open PeteKM Folder in \(PaletteCommandID.editorName)"
@@ -61,7 +63,8 @@ enum PaletteCommandID: String, CaseIterable, Identifiable {
         case .openDate: return "Open a past day by date, like 2026-08-19 or \"last friday\"."
         case .openScratch: return "The pane under the editor. Carries over day to day; never filed, never committed."
         case .searchAllPeteKM: return "Full-text search across Daily Stickies and the Library."
-        case .openLibraryFile: return "Open a Library file by name."
+        case .openLibraryFile: return "Open a Library file by name. Type \"/ \" here to jump straight in."
+        case .insertLibraryPath: return "Find a Library folder or file and type its path into the note, so the filing agent sends the item there."
         case .openLibraryIndex: return "Open INDEX.md — the map of the Library and where things get filed."
         case .openLibraryInEditor: return "Open the library/ folder in \(PaletteCommandID.editorName)."
         case .openFolderInEditor: return "Open the whole PeteKM folder in \(PaletteCommandID.editorName)."
@@ -77,7 +80,8 @@ enum PaletteCommandID: String, CaseIterable, Identifiable {
     var group: String {
         switch self {
         case .openDailySticky, .openPreviousDailySticky, .openDate, .openScratch: return "Daily Sticky"
-        case .searchAllPeteKM, .openLibraryFile, .openLibraryIndex, .openLibraryInEditor: return "Library"
+        case .searchAllPeteKM, .openLibraryFile, .insertLibraryPath, .openLibraryIndex,
+             .openLibraryInEditor: return "Library"
         case .openFolderInEditor, .openCurrentFileInEditor, .openTerminal, .revealFolderInFinder: return "External"
         case .reviewInbox, .gitSync, .settings: return "PeteKM"
         }
@@ -93,6 +97,8 @@ enum PaletteOutcome: Equatable {
     case openFile(URL, reveal: NSRange?)
     case revealFolderInFinder
     case openSettings
+    /// Type text at the caret of the Daily Sticky — the destination hint (§6 of AGENTS.md).
+    case insertText(String)
 
     // Phase 6 — external tools (§12, §15.1, §17). Each degrades to a notice.
     /// Open a path in the external editor, with the PeteKM folder as workspace.

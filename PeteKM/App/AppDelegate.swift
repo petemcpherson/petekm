@@ -31,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         observeSettings()
         observeFolder()
         observeSettingsShortcut()
+        observeSummonRequests()
         UpdateController.shared.apply(settings: settings)
 
         controller.summon()
@@ -90,6 +91,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuBar.onRevealFolder = hasFolder ? { [weak self] in self?.revealFolder() } : nil
         menuBar.onSearch = hasFolder ? { [weak self] in self?.openSearch() } : nil
         menuBar.refresh()
+    }
+
+    private func observeSummonRequests() {
+        NotificationCenter.default.addObserver(
+            forName: .peteKMSummonWindow,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.windowController?.summon() }
+        }
     }
 
     // MARK: - Actions

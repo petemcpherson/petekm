@@ -15,6 +15,7 @@ struct PaletteRow: Identifiable, Equatable {
     enum Kind: Equatable {
         case command(PaletteCommandID)
         case file(String)          // relative path
+        case path(String)          // relative path, inserted as text not opened
         case result(SearchResult)
         case day(Date)
     }
@@ -36,6 +37,7 @@ final class PaletteModel {
         case commands
         case search
         case files
+        case insertPath
         case date
 
         var prompt: String {
@@ -43,6 +45,7 @@ final class PaletteModel {
             case .commands: return "Command"
             case .search: return "Search All PeteKM"
             case .files: return "Open Library File"
+            case .insertPath: return "Insert Library Path"
             case .date: return "Open Date"
             }
         }
@@ -52,6 +55,7 @@ final class PaletteModel {
             case .commands: return nil
             case .search: return "Search"
             case .files: return "Library File"
+            case .insertPath: return "Insert Path"
             case .date: return "Date"
             }
         }
@@ -64,12 +68,35 @@ final class PaletteModel {
     /// Terse status shown in place of results — "Nothing in Inbox." (§13.12, DESIGN §31).
     private(set) var message: String?
 
-    var query = "" {
-        didSet {
-            guard query != oldValue else { return }
+    /// Backing store for `query`. Written only through the `query` setter so the
+    /// shortcut rewrite below happens exactly once per keystroke.
+    private var queryStorage = ""
+
+    var query: String {
+        get { queryStorage }
+        set {
+            guard newValue != queryStorage else { return }
             message = nil
+            if mode == .commands, let remainder = PaletteModel.libraryFileShortcut(newValue) {
+                // "/ " from the command list jumps straight to Open Library File… (§10.2).
+                queryStorage = remainder
+                mode = .files
+                refreshIndex()
+            } else {
+                queryStorage = newValue
+            }
             reload()
         }
+    }
+
+    /// Leading `"/ "` is the shortcut into file open. The space keeps it unambiguous —
+    /// a bare `/` is a legitimate character in a fuzzy path query.
+    nonisolated static let libraryFileShortcutPrefix = "/ "
+
+    /// Returns what should be searched for, or nil when `text` isn't the shortcut.
+    nonisolated static func libraryFileShortcut(_ text: String) -> String? {
+        guard text.hasPrefix(libraryFileShortcutPrefix) else { return nil }
+        return String(text.dropFirst(libraryFileShortcutPrefix.count))
     }
 
     private(set) var folder: PeteKMFolder?
@@ -82,6 +109,12 @@ final class PaletteModel {
     /// or Launch Services lookups (§10.2).
     private(set) var isGitRepository = false
     private(set) var isEditorAvailable = false
+    /// Insert-at-caret commands need somewhere to insert into.
+    var isDocumentOpen = true
+
+    /// What gets typed in front of an inserted path. The agent keys on the
+    /// `library/` prefix, not the arrow, but the arrow makes the scope explicit.
+    static let destinationHintPrefix = "-> "
 
     init(calendar: Calendar = .current, editor: ExternalEditor = ExternalEditorProvider.current) {
         self.calendar = calendar
@@ -110,6 +143,8 @@ final class PaletteModel {
             return isEditorAvailable
         case .gitSync:
             return isGitRepository
+        case .insertLibraryPath:
+            return isDocumentOpen
         default:
             return true
         }
@@ -119,7 +154,7 @@ final class PaletteModel {
 
     func present(mode: Mode = .commands) {
         self.mode = mode
-        query = ""
+        queryStorage = ""
         message = nil
         isPresented = true
         refreshAvailability()
@@ -129,7 +164,7 @@ final class PaletteModel {
 
     func dismiss() {
         isPresented = false
-        query = ""
+        queryStorage = ""
         mode = .commands
         message = nil
         rows = []
@@ -168,6 +203,8 @@ final class PaletteModel {
         case .file(let path):
             guard let folder else { return }
             perform(.openFile(folder.root.appending(path: path), reveal: nil))
+        case .path(let path):
+            perform(.insertText(PaletteModel.destinationHintPrefix + path))
         case .result(let result):
             guard let folder else { return }
             perform(.openFile(folder.root.appending(path: result.relativePath), reveal: result.range))
@@ -204,6 +241,9 @@ final class PaletteModel {
 
         case .openLibraryFile:
             present(mode: .files)
+
+        case .insertLibraryPath:
+            present(mode: .insertPath)
 
         case .openLibraryIndex:
             open(folder.index, whenMissing: "No Library Index yet.")
@@ -263,6 +303,7 @@ final class PaletteModel {
         case .commands: rows = commandRows()
         case .search: rows = searchRows()
         case .files: rows = fileRows()
+        case .insertPath: rows = pathRows()
         case .date: rows = dayRows()
         }
     }
@@ -320,6 +361,33 @@ final class PaletteModel {
     }
 
     /// Typed dates first, then existing Daily Stickies newest first (§10.2).
+    /// Folders *and* files, because the folder is the likelier destination. Rows
+    /// are inserted as text, never opened.
+    private func pathRows() -> [PaletteRow] {
+        guard let index else { return [] }
+
+        return LibraryPaths.destinations(from: index.libraryPaths)
+            .compactMap { path -> (String, Int)? in
+                let name = (path as NSString).lastPathComponent
+                guard let score = FuzzyMatch.score(query, in: name)
+                        ?? FuzzyMatch.score(query, in: path) else { return nil }
+                return (path, score)
+            }
+            .sorted { left, right in
+                left.1 == right.1 ? left.0 < right.0 : left.1 > right.1
+            }
+            .prefix(60)
+            .map { path, _ in
+                let parent = (path as NSString).deletingLastPathComponent
+                return PaletteRow(id: "insert:" + path,
+                                  title: (path as NSString).lastPathComponent
+                                      + (path.hasSuffix("/") ? "/" : ""),
+                                  subtitle: parent.isEmpty ? nil : parent,
+                                  snippet: nil,
+                                  kind: .path(path))
+            }
+    }
+
     private func dayRows() -> [PaletteRow] {
         guard let folder else { return [] }
 
@@ -370,6 +438,28 @@ final class PaletteModel {
 }
 
 /// Date entry for **Open Date…** — accepts what people actually type (§10.2).
+/// Insertable Library destinations. Folders are derived from indexed file paths —
+/// nothing on disk or in the index stores a folder list.
+enum LibraryPaths {
+
+    /// Every Library folder (trailing `/`, `library/` itself included) followed by
+    /// every Library file, each sorted.
+    static func destinations(from paths: [String]) -> [String] {
+        var folders: Set<String> = ["library/"]
+        for path in paths {
+            var components = path.split(separator: "/").map(String.init)
+            guard components.count > 1 else { continue }
+            components.removeLast()
+            var prefix = ""
+            for component in components {
+                prefix += component + "/"
+                folders.insert(prefix)
+            }
+        }
+        return folders.sorted() + paths.sorted()
+    }
+}
+
 enum PaletteDateInput {
 
     static func parse(_ raw: String, calendar: Calendar = .current, now: Date = Date()) -> Date? {

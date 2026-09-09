@@ -37,6 +37,8 @@ struct OnboardingView: View {
         case .structure: structure
         case .dailyPreference: dailyPreference
         case .claudeCode: claudeCode
+        case .skills: skills
+        case .setUpLibrary: setUpLibrary
         }
     }
 
@@ -92,9 +94,22 @@ struct OnboardingView: View {
                 }
             } else {
                 VStack(alignment: .leading, spacing: DS.Space.s4) {
-                    Button("Create a new PeteKM folder…") { model.chooseParentForNewFolder() }
-                        .buttonStyle(.borderedProminent)
-                    Button("Use an existing folder…") { model.chooseExistingFolder() }
+                    if let current = model.folder {
+                        Button("Keep using this folder") { model.keepCurrentFolder() }
+                            .buttonStyle(.borderedProminent)
+                            .keyboardShortcut(.defaultAction)
+                        Text(current.root.path(percentEncoded: false))
+                            .font(DS.Text.monoCaption)
+                            .foregroundStyle(DS.Color.textTertiary)
+                            .lineLimit(1)
+                            .truncationMode(.head)
+                        Button("Create a new PeteKM folder…") { model.chooseParentForNewFolder() }
+                        Button("Use a different folder…") { model.chooseExistingFolder() }
+                    } else {
+                        Button("Create a new PeteKM folder…") { model.chooseParentForNewFolder() }
+                            .buttonStyle(.borderedProminent)
+                        Button("Use an existing folder…") { model.chooseExistingFolder() }
+                    }
                 }
             }
 
@@ -234,6 +249,129 @@ struct OnboardingView: View {
         }
     }
 
+    /// The four shipped skills, named once with the question each answers. The
+    /// app never runs them — this step exists so the commands in `.claude/skills/`
+    /// are not something the user has to discover by reading the folder
+    /// (`AgentTemplates.skillNames`, sync spec §3).
+    private var skills: some View {
+        ScrollView {
+            skillsContent
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var skillsContent: some View {
+        VStack(alignment: .leading, spacing: DS.Space.s5) {
+            header("Four commands",
+                   "Typed to your agent in the terminal, not in PeteKM. Process is the only one you need often.")
+
+            skillRow(
+                "/petekm-process",
+                "The main one. Files every Daily Sticky you haven't processed yet into the Library, oldest first, and leaves `daily/` untouched. Pass a date — `/petekm-process 2026-08-11` — to redo one specific day. Run it whenever you've captured enough to be worth filing."
+            )
+
+            skillRow(
+                "/petekm-status",
+                "Reports what has been processed and what hasn't. Use it when you're not sure whether a day made it into the Library yet."
+            )
+
+            skillRow(
+                "/petekm-rebuild-index",
+                "Regenerates `INDEX.md` from the files on disk. Run it after you add folders or copy notes in by hand — the agent files from that index, so it can't use a folder it hasn't seen. Process repairs a stale index on its own, but it can't see an empty folder or a copied file that kept an old timestamp."
+            )
+
+            skillRow(
+                "/petekm-organize",
+                "Deliberate restructuring: merging files, renaming, cleaning up folders. Processing stays conservative on purpose, so the big moves are a separate, explicit run."
+            )
+
+            Text("You can also just talk to the agent in plain language. The skills are shortcuts, not the only way in.")
+                .font(DS.Text.caption)
+                .foregroundStyle(DS.Color.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func skillRow(_ command: String, _ detail: String) -> some View {
+        VStack(alignment: .leading, spacing: DS.Space.s2) {
+            Text(command)
+                .font(DS.Text.mono)
+                .foregroundStyle(DS.Color.textPrimary)
+                .textSelection(.enabled)
+            Text(detail)
+                .font(DS.Text.callout)
+                .foregroundStyle(DS.Color.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    /// The last step suggests work the app deliberately does not do for you.
+    /// PeteKM imposes no folder system; `library/` starts empty and stays that
+    /// way until the user or their agent shapes it (§6.2, DESIGN §22).
+    private var setUpLibrary: some View {
+        // Scrolls only if it has to: this is the wordiest step, and the notice
+        // line plus a larger system text size can push it past the fixed height.
+        ScrollView {
+            setUpLibraryContent
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var setUpLibraryContent: some View {
+        VStack(alignment: .leading, spacing: DS.Space.s5) {
+            header("Set up your Library",
+                   "`library/` is empty. Its shape is yours to decide, and now is the easiest time.")
+
+            VStack(alignment: .leading, spacing: DS.Space.s2) {
+                Text("Create the folders you think in")
+                    .font(DS.Text.uiLabel)
+                Text("By project, by area of life, by topic. Some people use PARA — Projects, Areas, Resources, Archive. Most use their own categories. Either works, and your agent can build it for you if you'd rather describe it than click.")
+                    .font(DS.Text.callout)
+                    .foregroundStyle(DS.Color.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            VStack(alignment: .leading, spacing: DS.Space.s2) {
+                Text("Bring in notes you already have")
+                    .font(DS.Text.uiLabel)
+                Text("Copy existing Markdown into `library/`. Dated journals can go in `daily/` instead if they're named `YYYY-MM-DD.md` — but anything there is a read-only ledger from then on, so put everything else in `library/`.")
+                    .font(DS.Text.callout)
+                    .foregroundStyle(DS.Color.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            // Applies to both blocks above, not just the import: rebuilding the
+            // index regenerates the Areas section from the folders on disk, so a
+            // hand-made empty folder is invisible to the agent until it runs.
+            VStack(alignment: .leading, spacing: DS.Space.s2) {
+                Text("Then rebuild the index")
+                    .font(DS.Text.uiLabel)
+                Text("Whenever you add folders or files by hand — even empty folders — run `/petekm-rebuild-index` so `INDEX.md` matches what is on disk. Your agent files new notes from that index, so it can't use a folder it hasn't seen.")
+                    .font(DS.Text.callout)
+                    .foregroundStyle(DS.Color.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack(spacing: DS.Space.s4) {
+                Button("Reveal in Finder") { model.revealFolderInFinder() }
+                if model.isEditorAvailable {
+                    Button("Open in \(model.editorName)") { model.openFolderInEditor() }
+                }
+                Button("Open Terminal") { model.openTerminalAtFolder() }
+            }
+
+            if let notice = model.toolNotice {
+                Text(notice)
+                    .font(DS.Text.caption)
+                    .foregroundStyle(DS.Color.textTertiary)
+            }
+
+            Text("Optional. Nothing here has to happen now.")
+                .font(DS.Text.caption)
+                .foregroundStyle(DS.Color.textTertiary)
+        }
+    }
+
     // MARK: - Pieces
 
     private func header(_ title: String, _ detail: String) -> some View {
@@ -299,11 +437,11 @@ struct OnboardingView: View {
                     .keyboardShortcut(.defaultAction)
             case .chooseFolder:
                 EmptyView()
-            case .structure, .dailyPreference:
+            case .structure, .dailyPreference, .claudeCode, .skills:
                 Button("Continue") { model.advance() }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
-            case .claudeCode:
+            case .setUpLibrary:
                 Button("Open Daily Sticky") { model.finish() }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)

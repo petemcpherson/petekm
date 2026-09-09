@@ -1,0 +1,16 @@
+// Shared build configuration, checked into git.
+//
+// Signing identity is per-machine, so it lives in Config/Local.xcconfig,
+// which is gitignored. The optional include below means a machine without
+// that file still builds — DEVELOPMENT_TEAM resolves to empty, and Xcode
+// falls back to ad-hoc "Sign to Run Locally". Fine for a locally built
+// Mac app; needed only for distribution/notarization.
+//
+// To use your own team: create Config/Local.xcconfig containing
+//     PETEKM_DEVELOPMENT_TEAM = YOURTEAMID
+// Do not set the team in Xcode's Signing & Capabilities tab — that writes
+// it back into project.pbxproj and conflicts on every pull.
+
+#include? "Local.xcconfig"
+
+DEVELOPMENT_TEAM = $(PETEKM_DEVELOPMENT_TEAM)

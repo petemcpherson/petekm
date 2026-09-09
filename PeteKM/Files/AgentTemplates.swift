@@ -244,6 +244,38 @@ enum AgentTemplates {
     fits and you create a new file anyway, add a one-line rule so the next run
     files the same kind of item the same way.
 
+    ### Destination hints from the Daily Sticky
+
+    The user may name a destination in the Daily Sticky itself. **A path that
+    starts with `library/` is a destination hint**, wherever it appears — after an
+    arrow, in parentheses, or bare on its own line:
+
+    ```md
+    ## Acme call -> library/Work/Acme.md
+    - renewal moved to 2027
+
+    - keyboard for dad's birthday -> library/Lists/Gifts.md
+    ```
+
+    - **A hint outranks the Placement guide and outranks your judgment.** It is an
+      explicit instruction. Do not deliberate, do not look for a better home.
+    - **Scope comes from position.** On a heading line → everything under that
+      heading until the next heading. On a bullet or sentence → that item only.
+      Alone on its own line → from there to the next heading. An item-level hint
+      beats the heading it sits under.
+    - **Folder** (`library/Work/`) → choose or create a file inside it, named your
+      usual way. **File** (`library/Work/Acme.md`) → that exact file; create it if
+      it does not exist.
+    - **Only `library/` paths count.** A pasted `src/api/auth.ts`, a URL, or a shell
+      command is ordinary content, never a hint.
+    - **Unresolvable hint** — typo, a path that collides with an existing file, or
+      genuinely ambiguous → do not guess and do not silently fall back. Send the
+      item to `INBOX.md` with the hint quoted and one line on why it failed.
+    - The hint is part of the Daily Sticky: never strip it, rewrite it, or mark it
+      handled (§2). Do not copy the arrow into the Library file — record provenance
+      the normal way (§5).
+    - Hints are optional and rare. Most items carry none; file those exactly as before.
+
     ## 7. Human edits win
 
     The user edits Library files directly, in any tool. The on-disk version is always
@@ -399,9 +431,11 @@ enum AgentTemplates {
        run the incremental repair from `/petekm-rebuild-index` first.
     4. Read the Placement guide and Areas sections of `INDEX.md`. Grep the Files
        section as needed; do not read it whole.
-    5. For each item worth keeping (`AGENTS.md` §3), search the Library for an
-       existing destination before creating anything new. Follow the Placement
-       guide for new files; add a rule when none fits.
+    5. For each item worth keeping (`AGENTS.md` §3): if it carries a `library/…`
+       destination hint, file it exactly there and skip the rest of this step
+       (`AGENTS.md` §6). Otherwise search the Library for an existing destination
+       before creating anything new; follow the Placement guide for new files and
+       add a rule when none fits.
     6. Update or create Library files conservatively. Preserve uncertainty (§4) and
        record provenance back to the source Daily Sticky (§5).
     7. Anything you cannot confidently place goes to `INBOX.md` as a copy, with its

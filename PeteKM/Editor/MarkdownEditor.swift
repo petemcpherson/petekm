@@ -17,6 +17,27 @@ final class EditorController {
         textView.window?.makeFirstResponder(textView)
     }
 
+    /// Types `text` at the caret, replacing any selection. Routed through
+    /// `insertText(_:replacementRange:)` so undo and the text binding both fire,
+    /// exactly as if the user had typed it (§9).
+    func insert(_ text: String) {
+        guard let textView else { return }
+        textView.window?.makeFirstResponder(textView)
+
+        let range = clamp(textView.selectedRange(), in: textView)
+        var payload = text
+        if range.location > 0 {
+            let previous = (textView.string as NSString)
+                .substring(with: NSRange(location: range.location - 1, length: 1))
+            if previous != "\n" && previous != " " && previous != "\t" {
+                payload = " " + payload
+            }
+        }
+
+        textView.insertText(payload, replacementRange: range)
+        textView.scrollRangeToVisible(textView.selectedRange())
+    }
+
     func focusEditor() {
         guard let textView else { return }
         textView.window?.makeFirstResponder(textView)

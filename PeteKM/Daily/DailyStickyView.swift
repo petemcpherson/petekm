@@ -63,10 +63,14 @@ struct DailyStickyView: View {
         .conflictAlert(document: session.document)
         .onAppear {
             palette.configure(folder: folder) { perform($0, session: session) }
+            palette.isDocumentOpen = session.document != nil
             installPaletteShortcut()
             noticeIfAgentFilesOutOfDate()
             prepareScratch()
             syncLaunchCheck.runIfNeeded(folder: folder)
+        }
+        .onChange(of: session.document?.url) { _, _ in
+            palette.isDocumentOpen = session.document != nil
         }
         .onDisappear {
             removePaletteShortcut()
@@ -246,6 +250,9 @@ struct DailyStickyView: View {
 
         case .gitSync:
             gitSync(session: session)
+
+        case .insertText(let text):
+            editorController.insert(text)
         }
 
         editorController.focusEditor()

@@ -194,6 +194,38 @@ struct DailyFilesTests {
         defer { remove(folder) }
         #expect(DailyFiles.mostRecentSticky(before: day(2026, 8, 19), in: folder) == nil)
     }
+
+    @Test func recognisesBlankStickies() {
+        let date = day(2026, 8, 17)
+        #expect(DailyFiles.isBlankSticky("", for: date))
+        #expect(DailyFiles.isBlankSticky("\n\n   \n", for: date))
+        #expect(DailyFiles.isBlankSticky("# August 17, 2026\n\n", for: date))
+        #expect(!DailyFiles.isBlankSticky("# August 17, 2026\n\n## Work\n", for: date))
+        #expect(!DailyFiles.isBlankSticky("a thought", for: date))
+        // The heading of a *different* day is real content, not this day's own heading.
+        #expect(!DailyFiles.isBlankSticky("# August 17, 2026\n", for: day(2026, 8, 18)))
+    }
+
+    @Test func stepsOverBlankDaysWhenLookingBack() throws {
+        let folder = try makeTemporaryFolder()
+        defer { remove(folder) }
+
+        try FileWriting.writeAtomically("# August 10, 2026\n\n## Work\n", to: folder.dailySticky(for: day(2026, 8, 10)))
+        try FileWriting.writeAtomically("# August 17, 2026\n\n", to: folder.dailySticky(for: day(2026, 8, 17)))
+        try FileWriting.writeAtomically("", to: folder.dailySticky(for: day(2026, 8, 18)))
+
+        let previous = DailyFiles.mostRecentSticky(before: day(2026, 8, 19), in: folder)
+        #expect(previous?.lastPathComponent == "2026-08-10.md")
+    }
+
+    @Test func returnsNilWhenEveryPriorDayIsBlank() throws {
+        let folder = try makeTemporaryFolder()
+        defer { remove(folder) }
+        try FileWriting.writeAtomically("", to: folder.dailySticky(for: day(2026, 8, 17)))
+        try FileWriting.writeAtomically("# August 18, 2026\n\n", to: folder.dailySticky(for: day(2026, 8, 18)))
+
+        #expect(DailyFiles.mostRecentSticky(before: day(2026, 8, 19), in: folder) == nil)
+    }
 }
 
 // MARK: - Document write safety
@@ -413,6 +445,57 @@ struct DailySessionTests {
         #expect(text.contains("### Questions"))
         #expect(!text.contains("## Ancient"))
         #expect(text.hasPrefix(DailyDate.heading(for: Date())))
+    }
+
+    @Test func blankStickyIsPrunedOnFlush() throws {
+        let folder = try makeTemporaryFolder()
+        defer { remove(folder) }
+
+        let session = DailySession(folder: folder, settings: settings(.scratch))
+        let url = folder.dailySticky(for: Date())
+        #expect(FileWriting.exists(url))
+
+        session.flush()
+        #expect(!FileWriting.exists(url))
+    }
+
+    @Test func aStickyWithContentSurvivesFlush() throws {
+        let folder = try makeTemporaryFolder()
+        defer { remove(folder) }
+
+        let session = DailySession(folder: folder, settings: settings(.scratch))
+        session.document?.text = "one line is enough"
+        session.flush()
+
+        #expect(FileWriting.readText(folder.dailySticky(for: Date())) == "one line is enough")
+    }
+
+    @Test func pruningNeverTouchesALibraryFile() throws {
+        let folder = try makeTemporaryFolder()
+        defer { remove(folder) }
+        try FileManager.default.createDirectory(at: folder.library, withIntermediateDirectories: true)
+        let note = folder.library.appending(path: "empty.md")
+        try FileWriting.writeAtomically("", to: note)
+
+        let session = DailySession(folder: folder, settings: settings(.scratch))
+        session.open(fileURL: note)
+        session.flush()
+
+        #expect(FileWriting.exists(note))
+    }
+
+    @Test func leavingABlankDayForAnotherPrunesIt() throws {
+        let folder = try makeTemporaryFolder()
+        defer { remove(folder) }
+        try FileWriting.writeAtomically("history", to: folder.dailySticky(for: day(2026, 1, 5)))
+
+        let session = DailySession(folder: folder, settings: settings(.scratch))
+        let today = folder.dailySticky(for: Date())
+        #expect(FileWriting.exists(today))
+
+        session.open(date: day(2026, 1, 5))
+        #expect(!FileWriting.exists(today))
+        #expect(FileWriting.readText(folder.dailySticky(for: day(2026, 1, 5))) == "history")
     }
 
     @Test func pastStickiesOpenFullyEditable() throws {

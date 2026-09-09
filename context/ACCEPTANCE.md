@@ -14,6 +14,8 @@ automated coverage that guards it.
 | No manual naming | `DailyFiles` — filenames are derived from the date | — |
 | Blank / carry-forward / default-header starts | `NewDayComposer`, `AppSettings.dailyStartBehavior` | `DailySessionTests`, `SettingsTests` |
 | Carry-forward copies headings only | `MarkdownHeadings`, `NewDayComposer` | `DailySessionTests/carryForwardUsesTheMostRecentPriorSticky` |
+| A day with nothing written leaves no file | `DailySession.pruneIfBlank` on flush/leave; `DailyFiles.isBlankSticky` | `DailySessionTests/blankStickyIsPrunedOnFlush`, `/aStickyWithContentSurvivesFlush`, `/pruningNeverTouchesALibraryFile` |
+| Carry-forward looks past blank days | `DailyFiles.mostRecentSticky` | `DailyFilesTests/stepsOverBlankDaysWhenLookingBack` |
 
 ## Scratch (durable but unfiled)
 
@@ -72,6 +74,16 @@ uncertainty and Inbox policy in `AGENTS.md`. Guarded by
 `FolderInitializerTests/everySkillHasFrontmatterWithNameAndDescription` and
 `templatesStateTheImmutableLedgerRule`. The app contains zero AI functionality — it
 never invokes, monitors, or parses an agent.
+
+**Destination hints.** The user may steer one item or one section to a chosen
+Library path by writing it in the Daily Sticky (`-> library/Work/Acme.md`).
+`AGENTS.md` §6 states the rule once: a path starting with `library/` is a hint, it
+outranks the Placement guide, its scope comes from its position (heading, item, or
+own line), only `library/` paths count, and an unresolvable hint goes to `INBOX.md`
+rather than being guessed. `petekm-process` step 5 defers to it in one clause. The
+app never parses hints — it only helps type them: `Insert Library Path…` in the
+palette (`LibraryPaths.destinations` → `PaletteOutcome.insertText` →
+`EditorController.insert`), covered by `SearchTests/libraryDestinations*`.
 
 ## Safety
 

@@ -42,6 +42,12 @@ struct RootView: View {
             }
         }
         .onAppear { folderStore.revalidate() }
+        // A finished model is parked on its last step. Whenever onboarding is asked
+        // for again — Settings' "Show Onboarding Again", or the missing-folder panel —
+        // throw it away so the flow restarts at the welcome step.
+        .onChange(of: settings.hasCompletedOnboarding) { _, completed in
+            if !completed { onboarding = nil }
+        }
     }
 
     @ViewBuilder

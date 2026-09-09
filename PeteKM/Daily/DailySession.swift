@@ -169,8 +169,26 @@ final class DailySession {
     }
 
     private func adopt(_ document: StickyDocument) {
-        self.document?.saveNow()
+        let outgoing = self.document
+        outgoing?.saveNow()
+        pruneIfBlank(outgoing)
         self.document = document
+    }
+
+    /// Removes a Daily Sticky that holds nothing, so a day spent entirely in Scratch — or not
+    /// spent here at all — leaves no file behind. Deliberately narrow: blank in memory *and* on
+    /// disk, never dirty, never conflicted, never a Library file. The next open recreates it
+    /// identically, so there is nothing to lose and nothing to notice.
+    private func pruneIfBlank(_ document: StickyDocument?) {
+        guard let document,
+              !document.hasConflict, !document.isDirty,
+              let day = dailyDate(for: document.url),
+              DailyFiles.isBlankSticky(document.text, for: day, calendar: calendar),
+              let onDisk = FileWriting.readText(document.url),
+              DailyFiles.isBlankSticky(onDisk, for: day, calendar: calendar)
+        else { return }
+
+        try? FileManager.default.removeItem(at: document.url)
     }
 
     // MARK: - Lifecycle
@@ -187,6 +205,7 @@ final class DailySession {
 
     func flush() {
         document?.saveNow()
+        pruneIfBlank(document)
     }
 
     private func startWatching() {

@@ -3,7 +3,8 @@
 //  PeteKM
 //
 //  First-run flow (spec §6, DESIGN.md §22). Short: pick a folder, create the
-//  structure, choose how days start, open the Daily Sticky.
+//  structure, choose how days start, hand off to the agent, then point at the
+//  empty Library before opening the Daily Sticky.
 //
 
 import Foundation
@@ -20,6 +21,13 @@ final class OnboardingModel {
         case structure
         case dailyPreference
         case claudeCode
+        /// The `/petekm-*` commands, explained once. The app never runs them; this
+        /// step is the only place they are introduced before the folder is handed over.
+        case skills
+        /// Last step. Purely a suggestion: shape `library/` and import existing
+        /// notes now, while the folder is still empty. The app creates nothing
+        /// here — no folder system is imposed (§6.2).
+        case setUpLibrary
     }
 
     /// Sub-state of the folder step: the user is naming a new folder inside a
@@ -38,6 +46,8 @@ final class OnboardingModel {
     var adoptedExistingFolder = false
     var errorMessage: String?
     var gitNotice: String?
+    /// Terse result of a hand-off button on the last step. Never blocks (§15.3).
+    var toolNotice: String?
 
     init(folderStore: FolderStore, settings: AppSettings) {
         self.folderStore = folderStore
@@ -51,6 +61,32 @@ final class OnboardingModel {
     var isGitRepository: Bool {
         guard let folder else { return false }
         return GitSupport.isRepository(folder)
+    }
+
+    // MARK: - Library hand-off (last step)
+
+    private var editor: ExternalEditor { ExternalEditorProvider.current }
+
+    var editorName: String { editor.displayName }
+
+    var isEditorAvailable: Bool { editor.isAvailable }
+
+    func revealFolderInFinder() {
+        guard let folder else { return }
+        toolNotice = nil
+        ExternalTools.revealInFinder(folder.root)
+    }
+
+    func openFolderInEditor() {
+        guard let folder else { return }
+        toolNotice = editor.open(folder: folder.root) ? nil : editor.unavailableNotice
+    }
+
+    func openTerminalAtFolder() {
+        guard let folder else { return }
+        toolNotice = ExternalTools.openTerminal(at: folder.root)
+            ? nil
+            : ExternalTools.terminalUnavailableNotice
     }
 
     // MARK: - Navigation
@@ -103,6 +139,15 @@ final class OnboardingModel {
 
         adoptedExistingFolder = false
         adopt(url)
+    }
+
+    /// Replaying onboarding from Settings with a folder already set: keep it rather
+    /// than making the user re-pick their own folder. Runs the same `.keep` adoption,
+    /// so nothing on disk is overwritten (§19.2).
+    func keepCurrentFolder() {
+        guard let folder = folderStore.folder else { return }
+        adoptedExistingFolder = true
+        adopt(folder.root)
     }
 
     func chooseExistingFolder() {

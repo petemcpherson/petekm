@@ -7,6 +7,10 @@ extension Notification.Name {
 
     /// Posted by the menu bar's **Search All PeteKM…** — opens the palette in search mode (§10.2).
     static let peteKMOpenSearch = Notification.Name("petekm.openSearch")
+
+    /// Asks the app delegate to bring the capture window forward. Settings lives in its
+    /// own window, so an action taken there has to summon the sticky to be seen.
+    static let peteKMSummonWindow = Notification.Name("petekm.summonWindow")
 }
 
 /// Owns the single sticky capture window: it hides rather than closes, and remembers where it was (§8.6, §8.7).
