@@ -3,11 +3,12 @@ import Foundation
 /// Pure text-editing logic behind the editor niceties (§9.3). Kept free of AppKit so it is testable.
 enum EditorEdits {
 
+    /// No `'` — an apostrophe is far more common in prose than a quoted phrase.
     static let pairs: [Character: Character] = [
-        "(": ")", "[": "]", "{": "}", "\"": "\"", "'": "'", "`": "`"
+        "(": ")", "[": "]", "{": "}", "\"": "\"", "`": "`"
     ]
 
-    static let closers: Set<Character> = [")", "]", "}", "\"", "'", "`"]
+    static let closers: Set<Character> = [")", "]", "}", "\"", "`"]
 
     /// Two spaces per nesting level — matches what the highlighter reads back.
     static let indentUnit = "  "
@@ -47,7 +48,7 @@ enum EditorEdits {
     }
 
     private static func isQuote(_ character: Character) -> Bool {
-        character == "\"" || character == "'" || character == "`"
+        character == "\"" || character == "`"
     }
 
     // MARK: - List markers

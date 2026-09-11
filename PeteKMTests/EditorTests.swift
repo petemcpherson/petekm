@@ -48,8 +48,15 @@ import Testing
             == .wrapSelection(open: "\"", close: "\""))
 }
 
+@Test func singleQuoteIsNeverPaired() {
+    #expect(EditorEdits.autoClose(typing: "'", nextCharacter: nil, hasSelection: false) == .none)
+    #expect(EditorEdits.autoClose(typing: "'", nextCharacter: "'", hasSelection: false) == .none)
+    #expect(EditorEdits.autoClose(typing: "'", nextCharacter: nil, hasSelection: true) == .none)
+    #expect(!EditorEdits.deletesPair(previousCharacter: "'", nextCharacter: "'"))
+}
+
 @Test func quoteBeforeWordCharacterIsNotPaired() {
-    #expect(EditorEdits.autoClose(typing: "'", nextCharacter: "s", hasSelection: false) == .none)
+    #expect(EditorEdits.autoClose(typing: "\"", nextCharacter: "s", hasSelection: false) == .none)
     #expect(EditorEdits.autoClose(typing: "(", nextCharacter: "s", hasSelection: false)
             == .insertPair(open: "(", close: ")"))
 }

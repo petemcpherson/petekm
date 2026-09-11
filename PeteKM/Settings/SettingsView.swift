@@ -28,7 +28,6 @@ struct SettingsView: View {
             GuideSettingsView()
                 .tabItem { Label("Guide", systemImage: "book") }
         }
-        .frame(width: 460)
     }
 }
 
