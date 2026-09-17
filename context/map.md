@@ -80,7 +80,7 @@ Targets: `PeteKM` (app), `PeteKMTests` (**Swift Testing** — `@Test`/`#expect`)
 
 | File | Role |
 | --- | --- |
-| `AppDelegate.swift` | Background-resident lifecycle. Builds `RootView`, owns window controller, hotkey monitor, menu-bar item. `applicationShouldTerminateAfterLastWindowClosed → false` (§8.7). |
+| `AppDelegate.swift` | Background-resident lifecycle. Builds `RootView`, owns window controller, hotkey monitor, menu-bar item. `applicationShouldTerminateAfterLastWindowClosed → false` (§8.7). Keyboard ⌘Q hides instead of quitting (`applicationShouldTerminate`); mouse Quit, logout, and Sparkle still quit. |
 | `AppServices.swift` | `AppServices.shared` — the long-lived stores (`FolderStore`, `AppSettings`, `SyncLaunchCheck`). Honors `PETEKM_UITEST_FOLDER` env var to run against a scratch folder. |
 | `StickyWindowController.swift` | One sticky window. `summon()`, float-on-top, hide-not-close (§8.6). Owns the app's `Notification.Name` events, including `.peteKMSummonWindow` (Settings lives in its own window, so an action there must summon the sticky). |
 | `GlobalHotKeyMonitor.swift` + `KeyCombo.swift` | System-wide show/hide shortcut (§8.2). Needs Accessibility permission. |

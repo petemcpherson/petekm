@@ -40,6 +40,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // The app is a capture tool, not a document app: closing the window leaves it running (§8.7).
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
+    /// ⌘Q from the keyboard hides instead of quitting, so the global shortcut keeps working.
+    /// Every other path still quits: Quit chosen with the mouse (app menu or menu-bar item),
+    /// logout/shutdown, and Sparkle relaunching for an update.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard let event = NSApp.currentEvent,
+              event.type == .keyDown,
+              event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+              event.charactersIgnoringModifiers?.lowercased() == "q"
+        else { return .terminateNow }
+        windowController?.hide()
+        return .terminateCancel
+    }
+
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
         windowController?.summon()
         return true
