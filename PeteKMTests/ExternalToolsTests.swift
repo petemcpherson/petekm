@@ -196,7 +196,8 @@ private func makeRepositoryPair() throws -> (remote: URL, a: PeteKMFolder, b: Pe
     // borrows the status line instead of showing nothing.
     #expect(GitSupport.SyncOutcome.busy.notice(editorName: "Stub Editor") == nil)
     #expect(GitSupport.SyncOutcome.stuck.notice(editorName: "Stub Editor") == nil)
-    #expect(GitSupport.SyncOutcome.busy.manualNotice(editorName: "Stub Editor") == GitSupport.stuckLine)
+    #expect(GitSupport.SyncOutcome.busy.manualNotice(editorName: "Stub Editor") == GitSupport.busyLine)
+    #expect(GitSupport.SyncOutcome.stuck.manualNotice(editorName: "Stub Editor") == GitSupport.stuckLine)
     #expect(GitSupport.SyncOutcome.nothingToSync.notice(editorName: "Stub Editor") == "Already up to date.")
     #expect(GitSupport.SyncOutcome.noRemote.notice(editorName: "Stub Editor") == "Saved locally. No GitHub remote is set.")
     // The conflict notice names the configured editor, never a hard-coded one (§5.4).
@@ -204,7 +205,8 @@ private func makeRepositoryPair() throws -> (remote: URL, a: PeteKMFolder, b: Pe
     #expect(!GitSupport.SyncOutcome.pullConflict.manualNotice(editorName: "Stub Editor").contains("VS Code"))
 
     for outcome: GitSupport.SyncOutcome in [.gitUnavailable, .notARepository, .offline, .noRemote,
-                                            .pullConflict, .pushFailed, .nothingToSync, .synced] {
+                                            .pullConflict, .pushFailed, .nothingToSync, .synced,
+                                            .busy, .stuck] {
         let notice = outcome.manualNotice(editorName: "Stub Editor")
         #expect(!notice.contains("Sorry"))
         #expect(!notice.contains("!"))

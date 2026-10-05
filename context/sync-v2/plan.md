@@ -72,10 +72,8 @@ Sync switches to it. No triggers yet.
       `SyncStatus.failing(.lock)` in Phase 3, which surfaces through the dot and status
       line instead. Make `notice(editorName:)` return `String?` (nil for both) and update
       its callers.
-      *Open question:* a manual Sync that hits `.busy` shows nothing under the spec. If
-      that feels broken in testing, the smallest fix is to reuse the §8.4 "Sync is stuck"
-      line for manual runs only.
-      *Done:* `SyncOutcome.manualNotice(editorName:)` does exactly that for manual runs.
+- [x] `SyncOutcome.manualNotice(editorName:) -> String` for manual runs (§5.5): `.busy` →
+      `GitSupport.busyLine`, `.stuck` → `GitSupport.stuckLine`, else the v1 notice.
 
 ### 1.3 Device trailer (§6.3)
 
@@ -99,9 +97,12 @@ returning only `SyncOutcome` for any remaining callers.
 - [x] Inputs (`SyncContext`):
   - `flush: @MainActor () -> Void` — injected; Phase 3 wires `DailySession.flush()`.
   - `reconcile: @MainActor () -> Void` — injected; wires `document?.reconcileWithDisk()`.
-  - `deadline: Date?` — for the 5s sleep/quit budget; each invocation's timeout is
-    `min(perCommandTimeout, deadline - now)`.
+  - `deadline: Date?` — for the 5s sleep/quit budget (§5.3). Network steps get
+    `min(30s, time left)` and are skipped once it's spent (→ `.offline`). Local steps get
+    `min(15s, max(time left, 1s))`, so the local commit always completes.
+    `rebase --abort` ignores the deadline.
   - `allowRebase: Bool` — false while back-off is `.paused` (§6.6); fetch still runs.
+    Still behind → `.pullConflict`, no push. Not behind → push as normal.
   - `runner: GitRunner`, `now: Date`, `calendar: Calendar`.
 - [x] Sequence, exactly as §6.1:
   0. `gitUnavailable` / `notARepository` checks, then guard (1.2).
@@ -138,7 +139,8 @@ returning only `SyncOutcome` for any remaining callers.
 - [x] `DailyStickyView.gitSync` and `FolderSettingsView.sync` call the new sequence with
       real flush/reconcile closures (Settings passes no-ops if no session is reachable;
       Phase 3 routes both through `AutoSync.request(.manual)` instead).
-- [x] Manual notices unchanged (v1 §5.3), plus the new `busy` line.
+- [x] Manual notices unchanged (v1 §5.3), plus the `busy` / `stuck` lines (§5.5) via
+      `manualNotice`.
 
 ### 1.7 Tests — new `PeteKMTests/GitSyncTests.swift`
 

@@ -111,12 +111,19 @@ nonisolated enum GitSupport {
             }
         }
 
-        /// What a manual Sync shows. A click that shows nothing feels broken, so
-        /// the internal outcomes borrow the §8.4 "stuck" status line here only.
+        /// What a manual Sync shows (sync v2 §5.5). A click must always answer,
+        /// so the internal outcomes get a line here, and only here.
         func manualNotice(editorName: String) -> String {
-            notice(editorName: editorName) ?? GitSupport.stuckLine
+            switch self {
+            case .busy: return GitSupport.busyLine
+            case .stuck: return GitSupport.stuckLine
+            default: return notice(editorName: editorName) ?? GitSupport.busyLine
+            }
         }
     }
+
+    /// Sync v2 §5.5: manual Sync while another tool briefly holds the folder.
+    static let busyLine = "Another Git tool is using this folder. Try Sync again in a moment."
 
     /// Sync v2 §8.4, failing (lock).
     static let stuckLine = "Sync is stuck — another Git tool is mid-operation in this folder."

@@ -84,6 +84,12 @@ macOS gives a sleeping app only a few seconds. On `willSleep`:
 
 1. Flush the open document and commit locally. This is local and takes milliseconds, and it always completes.
 2. Attempt fetch/rebase/push with a hard 5s budget. If it doesn't finish, kill the git process. A killed fetch or push leaves the repository consistent. A killed rebase must be followed by `git rebase --abort` on the next run (§6.4).
+
+How the budget applies (a deadline, not a blanket cap):
+
+- **Network steps** (`fetch`, `push`) get `min(30s, time left)`. Once the deadline has passed they are not started, and the run ends as `.offline`.
+- **Local steps** get `min(15s, max(time left, 1s))`. The 1s floor means step 1 always completes, even when the budget is already spent. Without it, an expired deadline would make every local command fail and misreport the folder as having no git or no remote.
+- **`git rebase --abort`** after a failed rebase ignores the deadline. Leaving a rebase half-done is worse than a slightly late sleep. If the abort itself fails, the marker stays, and the next run's guard finishes the job.
 3. The wake trigger (§5.1) retries on the next open. Nothing depends on step 2 succeeding.
 
 ### 5.4 Pre-New-Day trigger
@@ -96,6 +102,15 @@ Palette → Sync, Settings → Sync, and the new "Sync Now" menu item (§8.2) ca
 
 - They always show the v1 `SyncOutcome` notice, including "Synced." and "Already up to date."
 - They ignore the back-off rules in §6.6.
+
+A manual run never ends in silence. When the guard (§6.4) skips a manual run, it shows:
+
+| Outcome | Manual notice |
+| --- | --- |
+| `.busy` (another tool holds the folder right now) | "Another Git tool is using this folder. Try Sync again in a moment." |
+| `.stuck` (the same, for over 10 min) | "Sync is stuck — another Git tool is mid-operation in this folder." (§8.4 line) |
+
+Automatic runs stay silent on both.
 
 ## 6. The run
 
@@ -189,7 +204,7 @@ Carry-forward (`.carryForwardHeaders`) reads the most recent prior sticky. Runni
 | --- | --- | --- |
 | `.offline` | Keep committing locally on departure triggers. No network attempts until `NWPathMonitor` reports satisfied, or a summon/wake trigger fires. | Next successful fetch |
 | `.pushFailed` (auth, permissions, rejected) | Retry at most once per 15 min, and only on triggers | Next successful push |
-| `.pullConflict` (paused) | Departure triggers still commit locally. **No automatic rebase attempts.** Fetch still runs so status stays accurate. | Local `HEAD` or `@{upstream}` changes, meaning someone resolved it or new commits arrived. Then retry once. |
+| `.pullConflict` (paused) | Departure triggers still commit locally. **No automatic rebase attempts.** Fetch still runs so status stays accurate. While still behind, no push either: GitHub would reject it, so the run ends `.pullConflict` again. Once not behind (someone resolved it), the run pushes normally. | Local `HEAD` or `@{upstream}` changes, meaning someone resolved it or new commits arrived. Then retry once. |
 | `.busy` | Silent | Next trigger |
 | `.gitUnavailable` / `.notARepository` / `.noRemote` | Automatic sync inert; toggle hidden (§4) | Settings change |
 
@@ -371,7 +386,7 @@ This goes in Settings → Guide as a short "Using two Macs" section, in the same
 
 | File | Change |
 | --- | --- |
-| `GitSupport.swift` | Timeouts + env + stderr capture in `run` (§6.7). Split `sync` into the v2 sequence (§6.1) with main-actor flush/reconcile callbacks injected as closures so the sequence stays testable. Add `.busy` outcome (internal; never shown as a notice). `isBusy(_:)` lock checks (§6.4). Device trailer in `commit` (§6.3). `otherDeviceLastCommit(_:thisDevice:)` (§9.3). `dailyPathsChangedOnBothSides(_:)` (§7.3). |
+| `GitSupport.swift` | Timeouts + env + stderr capture in `run` (§6.7). Split `sync` into the v2 sequence (§6.1) with main-actor flush/reconcile callbacks injected as closures so the sequence stays testable. Add `.busy` and `.stuck` outcomes (no automatic notice; manual lines in §5.5). `busyReason(_:)` lock checks (§6.4). Device trailer in `commit` (§6.3). `otherDeviceLastCommit(_:thisDevice:)` (§9.3). `dailyPathsChangedOnBothSides(_:)` (§7.3). |
 | `SyncLaunchCheck.swift` | Unchanged; used only when automatic sync is off. |
 | `AppServices.swift` | Construct and hold `AutoSync`. |
 | `AppDelegate.swift` | Wire wake/sleep observers into `AutoSync`. `applicationShouldTerminate`: run the quit departure sync and the §9.2 alert, preserving the existing keyboard-⌘Q-hides branch and the never-alert paths (logout, Sparkle). |
@@ -449,3 +464,6 @@ Each could be revisited, but none blocks implementation.
 4. No warning on the receiving Mac about the other Mac's unpushed work, because it is impossible to know. "Last from <Mac>: <time>" plus sender-side signals (dot, quit alert, wake notice) replace it.
 5. The window indicator is a dot that appears only when something is wrong or waiting. No persistent "synced" chrome.
 6. Editing-idle departure is 60s, trading more commits for a smaller unsynced window.
+7. A manual Sync always answers, including when skipped as busy or stuck (§5.5). Automatic runs stay silent.
+8. The sleep/quit budget is a deadline that skips network steps once spent but always lets the local commit and a rebase abort finish (§5.3).
+9. A paused run that is still behind does not push (§6.6): the push could only be rejected.
