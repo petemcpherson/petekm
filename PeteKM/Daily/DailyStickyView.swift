@@ -173,10 +173,12 @@ struct DailyStickyView: View {
         scratch = ScratchStore(folder: folder)
 
         // Folders created before Scratch existed keep their own `.gitignore`; make sure it
-        // excludes the scratch file before the user can type anything into it.
+        // excludes the scratch file before the user can type anything into it. Folders
+        // created before sync v2 also gain the daily union-merge line.
         let folder = folder
         Task.detached(priority: .utility) {
             FolderInitializer.ensureScratchIgnored(folder)
+            FolderInitializer.ensureDailyUnionMerge(folder)
         }
     }
 

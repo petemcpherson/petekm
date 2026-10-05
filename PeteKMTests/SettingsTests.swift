@@ -29,6 +29,7 @@ private func freshDefaults() -> UserDefaults {
     #expect(s.autoClosePairs)
     #expect(s.continueListMarkers)
     #expect(s.automaticUpdateChecks)
+    #expect(s.syncAutomatically)               // sync v2 §4: on by default
 }
 
 @Test func everySettingSurvivesRelaunch() {
@@ -45,6 +46,7 @@ private func freshDefaults() -> UserDefaults {
     s.autoClosePairs = false
     s.continueListMarkers = false
     s.automaticUpdateChecks = false
+    s.syncAutomatically = false
 
     let reloaded = settings(in: defaults)
     #expect(reloaded.dailyStartBehavior == .carryForwardHeaders)
@@ -57,6 +59,7 @@ private func freshDefaults() -> UserDefaults {
     #expect(reloaded.autoClosePairs == false)
     #expect(reloaded.continueListMarkers == false)
     #expect(reloaded.automaticUpdateChecks == false)
+    #expect(reloaded.syncAutomatically == false)
 }
 
 // MARK: - Window background

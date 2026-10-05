@@ -29,6 +29,7 @@ nonisolated struct PeteKMFolder: Equatable, Hashable {
     var inbox: URL { root.appending(path: "INBOX.md") }
     var state: URL { root.appending(path: ".petekm-state.json") }
     var gitignore: URL { root.appending(path: ".gitignore") }
+    var gitattributes: URL { root.appending(path: ".gitattributes") }
 
     /// The Scratch pane's backing file. Deliberately outside the daily/library contract:
     /// dot-prefixed so the search index skips it, `.gitignore`d so Sync never commits

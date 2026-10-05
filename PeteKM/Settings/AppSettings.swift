@@ -92,6 +92,7 @@ final class AppSettings {
         static let textHex = "petekm.textHex"
         static let scratchVisible = "petekm.scratchVisible"
         static let scratchHeight = "petekm.scratchHeight"
+        static let syncAutomatically = "petekm.syncAutomatically"
     }
 
     /// Opacity floor: the window must stay findable.
@@ -124,6 +125,7 @@ final class AppSettings {
         _scratchHeight = AppSettings.clampScratchHeight(
             defaults.object(forKey: Keys.scratchHeight) as? Double ?? 160
         )
+        syncAutomatically = defaults.object(forKey: Keys.syncAutomatically) as? Bool ?? true
         floatOnTop = defaults.object(forKey: Keys.floatOnTop) as? Bool ?? false
         hideDockIcon = defaults.object(forKey: Keys.hideDockIcon) as? Bool ?? false
         hideMenuBarItem = defaults.object(forKey: Keys.hideMenuBarItem) as? Bool ?? false
@@ -272,6 +274,12 @@ final class AppSettings {
     }
 
     /// Background update checks (§20.2). Installing always needs consent.
+    /// Sync v2 §4: sync with GitHub on its own. Only has an effect when the folder is
+    /// a repository with a remote.
+    var syncAutomatically: Bool {
+        didSet { defaults.set(syncAutomatically, forKey: Keys.syncAutomatically) }
+    }
+
     var automaticUpdateChecks: Bool {
         didSet { defaults.set(automaticUpdateChecks, forKey: Keys.automaticUpdateChecks) }
     }

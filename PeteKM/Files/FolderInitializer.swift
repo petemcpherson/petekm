@@ -91,6 +91,12 @@ enum FolderInitializer {
             report.kept.removeAll { $0 == ".gitignore" }
         }
 
+        // Same for `.gitattributes`: user lines are kept, the daily union line is added.
+        if ensureDailyUnionMerge(folder), !report.created.contains(".gitattributes") {
+            report.created.append(".gitattributes")
+            report.kept.removeAll { $0 == ".gitattributes" }
+        }
+
         return report
     }
 
@@ -119,6 +125,32 @@ enum FolderInitializer {
         var text = existing
         if !text.isEmpty && !text.hasSuffix("\n") { text += "\n" }
         text += missing.joined(separator: "\n") + "\n"
+        try? FileWriting.writeAtomically(text, to: url)
+        return true
+    }
+
+    /// Guarantees `.gitattributes` merges Daily Stickies by line union (sync v2 §7.5).
+    ///
+    /// Modeled on `ensureScratchIgnored`: creates the file when missing, appends the
+    /// line when absent, never replaces what the user already has. Folders that
+    /// predate sync v2 are repaired on window open without a prompt. Returns true if
+    /// it wrote.
+    @discardableResult
+    static func ensureDailyUnionMerge(_ folder: PeteKMFolder) -> Bool {
+        let url = folder.gitattributes
+
+        guard let existing = FileWriting.readText(url) else {
+            try? FileWriting.writeAtomically(AgentTemplates.gitattributes, to: url)
+            return true
+        }
+
+        let present = Set(existing.split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) })
+        guard !present.contains(AgentTemplates.dailyUnionLine) else { return false }
+
+        var text = existing
+        if !text.isEmpty && !text.hasSuffix("\n") { text += "\n" }
+        text += AgentTemplates.dailyUnionLine + "\n"
         try? FileWriting.writeAtomically(text, to: url)
         return true
     }

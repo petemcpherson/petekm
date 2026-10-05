@@ -6,7 +6,7 @@ and point at `context/sync/spec.md`.
 ## Progress
 
 - [x] **Phase 1** — Hardened git engine (process env/timeouts/stderr, guards, v2 run sequence, trailer)
-- [ ] **Phase 2** — Daily union merge (`.gitattributes`) + `syncAutomatically` setting
+- [x] **Phase 2** — Daily union merge (`.gitattributes`) + `syncAutomatically` setting
 - [ ] **Phase 3** — `AutoSync` coordinator: triggers, coalescing, back-off, `SyncStatus`
 - [ ] **Phase 4** — Pre-New-Day: deferred first write of today's Daily Sticky
 - [ ] **Phase 5** — Visibility: dot + popover, menu bar, Settings, notices, quit alert, Guide, docs
@@ -175,34 +175,34 @@ as v1 from the user's point of view.
 
 ### 2.1 `.gitattributes` (§7.2, §7.5)
 
-- [ ] `PeteKMFolder.gitattributes` → `root/.gitattributes`.
-- [ ] `AgentTemplates.gitattributes`:
+- [x] `PeteKMFolder.gitattributes` → `root/.gitattributes`.
+- [x] `AgentTemplates.gitattributes`:
       ```
       # PeteKM: same-day Daily Stickies from two Macs keep both sets of lines.
       daily/*.md merge=union
       ```
       and `AgentTemplates.dailyUnionLine = "daily/*.md merge=union"`.
-- [ ] `FolderInitializer.ensureDailyUnionMerge(_:) -> Bool`, modeled line-for-line on
+- [x] `FolderInitializer.ensureDailyUnionMerge(_:) -> Bool`, modeled line-for-line on
       `ensureScratchIgnored`: create when missing, append when the line is absent, never
       replace user content, return true when it wrote.
-- [ ] Call it from `FolderInitializer.initialize` (same report patching as `.gitignore`)
+- [x] Call it from `FolderInitializer.initialize` (same report patching as `.gitignore`)
       and from `DailyStickyView.prepareScratch`'s detached task (window open repair).
-- [ ] The file is tracked: confirm `AgentTemplates.gitignore` does not ignore it.
-- [ ] Templates: add one line to `AgentTemplates.claudeMd` and `.agentsMd` naming
+- [x] The file is tracked: confirm `AgentTemplates.gitignore` does not ignore it.
+- [x] Templates: add one line to `AgentTemplates.claudeMd` and `.agentsMd` naming
       `.gitattributes` as "not yours to edit". This changes
       `agentTemplatesFingerprint`, which shows the existing out-of-date notice once —
       expected.
 
 ### 2.2 Setting (§4)
 
-- [ ] `AppSettings.Keys.syncAutomatically = "petekm.syncAutomatically"`, `Bool`,
+- [x] `AppSettings.Keys.syncAutomatically = "petekm.syncAutomatically"`, `Bool`,
       default `true`. Add to the defaults round-trip test in `SettingsTests`.
 
 ### 2.3 Tests
 
-- [ ] `FolderInitializerTests`: `ensureDailyUnionMerge` creates when missing, appends to an
+- [x] `FolderInitializerTests`: `ensureDailyUnionMerge` creates when missing, appends to an
       existing file with and without trailing newline, idempotent on second call.
-- [ ] `GitSyncTests` (uses the Phase 1 fixture, with `.gitattributes` committed):
+- [x] `GitSyncTests` (uses the Phase 1 fixture, with `.gitattributes` committed):
   - Both clones append different lines to the same `daily/` file → rebase succeeds,
     every line from both sides present, `mergedDailyPaths` contains the path.
   - Add/add: both clones create the same `daily/YYYY-MM-DD.md` with different bodies →

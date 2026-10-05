@@ -254,6 +254,65 @@ struct AgentTemplateTests {
         #expect(FolderInitializer.agentTemplatesFingerprint == FolderInitializer.agentTemplatesFingerprint)
     }
 
+    // MARK: - .gitattributes (sync v2 §7.5)
+
+    @Test func initializeWritesTheDailyUnionMerge() throws {
+        let folder = try makeTemporaryFolder()
+        defer { remove(folder) }
+
+        let report = try FolderInitializer.initialize(folder)
+        #expect(FileWriting.readText(folder.gitattributes) == AgentTemplates.gitattributes)
+        #expect(report.created.contains(".gitattributes"))
+    }
+
+    @Test func ensureDailyUnionMergeCreatesWhenMissing() throws {
+        let folder = try makeTemporaryFolder()
+        defer { remove(folder) }
+
+        #expect(FolderInitializer.ensureDailyUnionMerge(folder))
+        #expect(FileWriting.readText(folder.gitattributes) == AgentTemplates.gitattributes)
+        #expect(AgentTemplates.gitattributes.contains(AgentTemplates.dailyUnionLine))
+    }
+
+    @Test func ensureDailyUnionMergeAppendsAfterATrailingNewline() throws {
+        let folder = try makeTemporaryFolder()
+        defer { remove(folder) }
+        try FileWriting.writeAtomically("*.png binary\n", to: folder.gitattributes)
+
+        #expect(FolderInitializer.ensureDailyUnionMerge(folder))
+        #expect(FileWriting.readText(folder.gitattributes)
+                == "*.png binary\n\(AgentTemplates.dailyUnionLine)\n")
+    }
+
+    @Test func ensureDailyUnionMergeAppendsWithoutATrailingNewline() throws {
+        let folder = try makeTemporaryFolder()
+        defer { remove(folder) }
+        try FileWriting.writeAtomically("*.png binary", to: folder.gitattributes)
+
+        #expect(FolderInitializer.ensureDailyUnionMerge(folder))
+        #expect(FileWriting.readText(folder.gitattributes)
+                == "*.png binary\n\(AgentTemplates.dailyUnionLine)\n")
+    }
+
+    @Test func ensureDailyUnionMergeIsIdempotent() throws {
+        let folder = try makeTemporaryFolder()
+        defer { remove(folder) }
+
+        #expect(FolderInitializer.ensureDailyUnionMerge(folder))
+        let before = FileWriting.readText(folder.gitattributes)
+        #expect(!FolderInitializer.ensureDailyUnionMerge(folder))
+        #expect(FileWriting.readText(folder.gitattributes) == before)
+    }
+
+    @Test func agentFilesNameGitattributesAsNotTheirs() {
+        #expect(AgentTemplates.claudeMd.contains("`.gitattributes`"))
+        #expect(AgentTemplates.agentsMd.contains("`.gitattributes`"))
+    }
+
+    @Test func gitattributesIsTrackedNotIgnored() {
+        #expect(!AgentTemplates.gitignore.contains(".gitattributes"))
+    }
+
     @Test func gitignoreIgnoresOnlyDisposableState() {
         #expect(AgentTemplates.gitignore.contains(".petekm-state.json"))
         #expect(AgentTemplates.gitignore.contains(".DS_Store"))

@@ -62,6 +62,20 @@ enum AgentTemplates {
         ".petekm-backups/",
     ]
 
+    // MARK: - .gitattributes (sync v2 §7.2)
+
+    /// Tracked, so it travels to every clone. `union` is a built-in git merge driver:
+    /// where two Macs edited the same day, it keeps lines from both instead of
+    /// stopping on a conflict. Every other path keeps the abort-and-pause behavior.
+    static let gitattributes = """
+    # PeteKM: same-day Daily Stickies from two Macs keep both sets of lines.
+    daily/*.md merge=union
+    """
+
+    /// The line `.gitattributes` must carry. Appended to an existing file on folders
+    /// created before sync v2 — a missed line only means a same-day edit pauses sync.
+    static let dailyUnionLine = "daily/*.md merge=union"
+
     // MARK: - .petekm-state.json (§5.7)
 
     static let state = """
@@ -88,6 +102,7 @@ enum AgentTemplates {
     - `AGENTS.md` — the full librarian policy.
     - `.petekm-state.json` — small, disposable operational state.
     - `.petekm-scratch.md` — the user's private scratch pad. Not yours. See below.
+    - `.gitattributes` — tells Sync how to merge Daily Stickies. Not yours to edit.
 
     ## The rule that never bends
 
@@ -175,6 +190,9 @@ enum AgentTemplates {
     for this afternoon. Never read it, grep it, summarize it, quote it, or copy any
     fragment of it anywhere. Never file it. Never mention what is in it. It is
     `.gitignore`d and it is not knowledge.
+
+    **`.gitattributes` is not yours to edit.** The app keeps it so the same day's
+    Daily Sticky written on two Macs merges by keeping both sets of lines.
 
     Your filing work stays inside this folder. Routine filing never needs to modify
     files elsewhere on the computer.

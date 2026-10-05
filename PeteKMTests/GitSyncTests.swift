@@ -79,6 +79,14 @@ final class GitFixture {
         FileManager.default.fileExists(atPath: folder.gitDirectory.appending(path: gitPath).path(percentEncoded: false))
     }
 
+    /// Ships `.gitattributes` from A and brings it into B, the way a v2 folder looks
+    /// once both Macs have synced once.
+    func shareDailyUnionMerge() async {
+        FolderInitializer.ensureDailyUnionMerge(a)
+        _ = await run(a)
+        _ = await run(b)
+    }
+
     func run(_ folder: PeteKMFolder, device: String = "Test Mac",
              flush: @escaping @MainActor @Sendable () -> Void = {},
              allowRebase: Bool = true) async -> GitSupport.SyncRun {
@@ -490,4 +498,104 @@ private func fakeRepository() throws -> PeteKMFolder {
     #expect(!GitSupport.isDailyStickyPath("daily/sub/2026-10-05.md"))
     #expect(!GitSupport.isDailyStickyPath("library/daily/2026-10-05.md"))
     #expect(!GitSupport.isDailyStickyPath("daily/notes.txt"))
+}
+
+// MARK: - Daily union merge (§7.2–§7.5)
+
+private func lines(_ data: Data) -> Set<Substring> {
+    Set(String(decoding: data, as: UTF8.self).split(separator: "\n"))
+}
+
+@Test func dailyUnionMergeAttributeIsTrackedAndShared() async throws {
+    guard let fixture = try GitFixture() else { return }
+    await fixture.shareDailyUnionMerge()
+
+    #expect(fixture.git(["ls-files", ".gitattributes"], in: fixture.a) == ".gitattributes")
+    #expect(fixture.git(["check-attr", "merge", "daily/2026-10-05.md"], in: fixture.b)
+            == "daily/2026-10-05.md: merge: union")
+    #expect(fixture.git(["check-attr", "merge", "library/note.md"], in: fixture.b)
+            == "library/note.md: merge: unspecified")
+}
+
+@Test func sameDayStickyOnTwoMacsKeepsEveryLine() async throws {
+    guard let fixture = try GitFixture() else { return }
+    await fixture.shareDailyUnionMerge()
+    let path = "daily/2026-10-05.md"
+    try fixture.write("# 2026-10-05\n\n- start\n", path, in: fixture.a)
+    #expect(await fixture.run(fixture.a).outcome == .synced)
+    #expect(await fixture.run(fixture.b).outcome == .synced)
+
+    try fixture.write("# 2026-10-05\n\n- start\n- from A\n", path, in: fixture.a)
+    #expect(await fixture.run(fixture.a).outcome == .synced)
+    try fixture.write("# 2026-10-05\n\n- start\n- from B\n", path, in: fixture.b)
+
+    let run = await fixture.run(fixture.b)
+    #expect(run.outcome == .synced)
+    #expect(run.didBringIn)
+    #expect(run.mergedDailyPaths == [path])
+    let merged = lines(try fixture.read(path, in: fixture.b))
+    #expect(merged.isSuperset(of: ["# 2026-10-05", "- start", "- from A", "- from B"]))
+    #expect(!String(decoding: try fixture.read(path, in: fixture.b), as: UTF8.self).contains("<<<<<<<"))
+    #expect(!fixture.exists("rebase-merge", in: fixture.b))
+    #expect(fixture.git(["status", "--porcelain"], in: fixture.b) == "")
+
+    // A catches up to the same file.
+    #expect(await fixture.run(fixture.a).outcome == .synced)
+    #expect(try fixture.read(path, in: fixture.a) == fixture.read(path, in: fixture.b))
+}
+
+/// Both Macs started the day independently: an add/add on today's file.
+@Test func sameDayStickyCreatedOnBothMacsKeepsEveryLine() async throws {
+    guard let fixture = try GitFixture() else { return }
+    await fixture.shareDailyUnionMerge()
+    let path = "daily/2026-10-05.md"
+    try fixture.write("# 2026-10-05\n\n## Work\n- written on A\n", path, in: fixture.a)
+    #expect(await fixture.run(fixture.a).outcome == .synced)
+    try fixture.write("# 2026-10-05\n\n## Personal\n- written on B\n", path, in: fixture.b)
+
+    let run = await fixture.run(fixture.b)
+    #expect(run.outcome == .synced)
+    #expect(run.mergedDailyPaths == [path])
+    let merged = lines(try fixture.read(path, in: fixture.b))
+    #expect(merged.isSuperset(of: ["# 2026-10-05", "## Work", "- written on A",
+                                   "## Personal", "- written on B"]))
+}
+
+/// The attribute keeps Library conflicts exactly as they were: abort and pause.
+@Test func libraryConflictStillPausesWithTheAttribute() async throws {
+    guard let fixture = try GitFixture() else { return }
+    await fixture.shareDailyUnionMerge()
+    try fixture.write("shared\n", "library/note.md", in: fixture.a)
+    #expect(await fixture.run(fixture.a).outcome == .synced)
+    #expect(await fixture.run(fixture.b).outcome == .synced)
+
+    try fixture.write("edited on A\n", "library/note.md", in: fixture.a)
+    #expect(await fixture.run(fixture.a).outcome == .synced)
+    try fixture.write("edited on B\n", "library/note.md", in: fixture.b)
+    let before = try fixture.read("library/note.md", in: fixture.b)
+
+    #expect(await fixture.run(fixture.b).outcome == .pullConflict)
+    #expect(try fixture.read("library/note.md", in: fixture.b) == before)
+    #expect(!fixture.exists("rebase-merge", in: fixture.b))
+}
+
+/// Self-healing rollout (§7.5): a clone that has not received the attribute yet
+/// still pauses safely on a same-day edit — nothing lost, nothing half-done.
+@Test func sameDayStickyWithoutTheAttributeStillPausesSafely() async throws {
+    guard let fixture = try GitFixture() else { return }
+    let path = "daily/2026-10-05.md"
+    try fixture.write("- start\n", path, in: fixture.a)
+    #expect(await fixture.run(fixture.a).outcome == .synced)
+    #expect(await fixture.run(fixture.b).outcome == .synced)
+
+    try fixture.write("- start\n- from A\n", path, in: fixture.a)
+    #expect(await fixture.run(fixture.a).outcome == .synced)
+    try fixture.write("- start\n- from B\n", path, in: fixture.b)
+    let before = try fixture.read(path, in: fixture.b)
+
+    let run = await fixture.run(fixture.b)
+    #expect(run.outcome == .pullConflict)
+    #expect(try fixture.read(path, in: fixture.b) == before)
+    #expect(!fixture.exists("rebase-merge", in: fixture.b))
+    #expect(!fixture.exists(GitSupport.rebaseMarkerName, in: fixture.b))
 }
