@@ -9,7 +9,7 @@
 import Foundation
 
 /// Every path the app knows about inside a PeteKM folder, derived from its root.
-struct PeteKMFolder: Equatable, Hashable {
+nonisolated struct PeteKMFolder: Equatable, Hashable {
     let root: URL
 
     init(root: URL) {

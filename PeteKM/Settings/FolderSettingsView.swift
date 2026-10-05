@@ -237,10 +237,12 @@ private struct GitSettingsSection: View {
         let folder = folder
         let editorName = ExternalEditorProvider.current.displayName
         Task {
-            let outcome = await Task.detached(priority: .utility) {
-                GitSupport.sync(folder)
+            // No session is reachable from Settings, so no flush or reconcile:
+            // the open sticky's autosave and directory watcher cover both.
+            let run = await Task.detached(priority: .utility) {
+                await GitSupport.run(folder, context: GitSupport.SyncContext())
             }.value
-            status = outcome.notice(editorName: editorName)
+            status = run.outcome.manualNotice(editorName: editorName)
             isWorking = false
             refresh()
         }

@@ -24,7 +24,7 @@ enum FileWriting {
         FileManager.default.fileExists(atPath: url.path(percentEncoded: false))
     }
 
-    static func isDirectory(_ url: URL) -> Bool {
+    nonisolated static func isDirectory(_ url: URL) -> Bool {
         var isDir: ObjCBool = false
         let found = FileManager.default.fileExists(atPath: url.path(percentEncoded: false), isDirectory: &isDir)
         return found && isDir.boolValue

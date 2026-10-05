@@ -269,21 +269,23 @@ struct DailyStickyView: View {
     }
 
     /// Git runs off the main actor and only ever reports back with a line of
-    /// text — capture never waits on it (§17.4).
+    /// text — capture never waits on it (§17.4). Flush and reconcile are the
+    /// only steps that come back to the main actor (sync v2 §6.1).
     private func gitSync(session: DailySession) {
         let folder = folder
+        let context = GitSupport.SyncContext(
+            flush: { [weak session] in session?.flush() },
+            // A run that brought changes in may have rewritten the open file;
+            // notice it now rather than at the next activation (sync v2 §6.2).
+            reconcile: { [weak session] in session?.document?.reconcileWithDisk() }
+        )
         Task {
-            let outcome = await Task.detached(priority: .utility) {
-                GitSupport.sync(folder)
+            let run = await Task.detached(priority: .utility) {
+                await GitSupport.run(folder, context: context)
             }.value
-            // A successful sync may have pulled a new version of the open file;
-            // notice it now rather than at the next activation (sync spec §5.5).
-            if outcome == .synced {
-                session.document?.reconcileWithDisk()
-            }
             // A conflict asks something of the user; give it the longer notice.
-            show(outcome.notice(editorName: ExternalEditorProvider.current.displayName),
-                 seconds: outcome == .pullConflict ? 15 : 6)
+            show(run.outcome.manualNotice(editorName: ExternalEditorProvider.current.displayName),
+                 seconds: run.outcome == .pullConflict ? 15 : 6)
         }
     }
 
