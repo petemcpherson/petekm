@@ -1,5 +1,5 @@
 import json,os,sys
-ROOT="/Users/petemcpherson/Coding Projects/PeteKM"
+ROOT=os.path.abspath(os.path.join(os.path.dirname(__file__),"..",".."))
 G=json.load(open(os.path.join(ROOT,"context/design-system/assets/robopete.grid.json")))
 rows=[y for y,r in enumerate(G) if any(c in "#B" for c in r)]
 cols=[x for x in range(len(G[0])) if any(r[x] in "#B" for r in G)]

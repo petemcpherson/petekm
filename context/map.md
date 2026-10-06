@@ -18,7 +18,7 @@ real detail lives.
 | `context/sync-v2/spec.md` | Automatic sync across devices: triggers, the hardened run, `daily/` union merge, Pre-New-Day, status dot/menu/quit alert. **Supersedes `context/sync/spec.md` §4.2** (manual-only) while "Sync automatically" is on. | ~470L |
 | `context/sync-v2/plan.md` | Sync v2 implementation plan (5 phases) + manual two-Mac checklist. Implemented. | ~520L |
 | `context/ACCEPTANCE.md` | Criterion → code → test mapping (spec §24, §22). Best "does X exist?" lookup. | ~100L |
-| `context/DISTRIBUTION.md` | Signing, notarization, Sparkle, `scripts/release.sh`. | ~57L |
+| `context/DISTRIBUTION.md` | Step-by-step release runbook: Homebrew cask (`Casks/petekm.rb`), signing, notarization, `scripts/release.sh`, deferred Sparkle. | ~250L |
 | `context/design-system/` | Tokens + pixel-art mark assets (`robopete*.png/svg`, `robopete.grid.json` — internal filenames only, no user-facing name). | — |
 
 ## Non-negotiable invariants
