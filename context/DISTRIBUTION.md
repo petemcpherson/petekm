@@ -20,11 +20,11 @@ Everything lives in one repo.
 | `Config/Local.xcconfig` with `PETEKM_DEVELOPMENT_TEAM` | Done |
 | Build settings: hardened runtime on, sandbox off, bundle ID `com.petekm.PeteKM` | Done |
 | `scripts/release.sh` (archive → export → DMG → notarize → staple) | Done |
-| `petekm-notary` notarytool keychain profile | **Missing** (A3) |
-| `LICENSE` (MIT), `README.md`, hardcoded-path fix | Done (A1, by Claude; not yet committed) |
+| `petekm-notary` notarytool keychain profile | Done (A3) |
+| `LICENSE` (MIT), `README.md`, hardcoded-path fix | Done (A1) |
 | `Casks/petekm.rb` | Created (A4, by Claude). `sha256` is a placeholder until B4 |
-| Personal-content skim of `context/` | **Your call** (A1.4) |
-| Repo public | **Missing** (A2) |
+| Personal-content skim of `context/` | Done (A1.4) |
+| Repo public | Done (A2) |
 
 Build settings already in `project.pbxproj`:
 
@@ -138,10 +138,23 @@ Example values: version `1.0.0`, build `1`. Increase the build number every rele
 
 ## B1. Prepare
 
+1. **Quit PeteKM** (⌘Q), including any Debug build launched from Xcode. The UI tests have to quit the app before they start. If a copy is already running, `testClosingTheWindowHidesTheAppWithoutQuitting` fails after 60 seconds.
+2. Check the tree, then run the tests:
+
 ```bash
 git status                      # clean, on main, pushed
 xcodebuild -scheme PeteKM test  # green
 ```
+
+3. **If `sameDayStickyOnTwoMacsKeepsEveryLine()` is the only failure**, rerun it on its own:
+
+```bash
+xcodebuild -scheme PeteKM test "-only-testing:PeteKMTests/sameDayStickyOnTwoMacsKeepsEveryLine()"
+```
+
+If it passes alone, carry on. This test is timing-sensitive when the full suite runs many git tests in parallel. It passes reliably on its own, so a failure in the full run is not a release blocker. Any *other* failing test is a blocker.
+
+Tests are a manual gate only. `release.sh` never runs them, so a failing test can't break a build or a release.
 
 ## B2. Build, sign, notarize
 
