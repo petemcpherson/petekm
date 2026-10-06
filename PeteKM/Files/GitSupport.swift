@@ -48,6 +48,32 @@ nonisolated enum GitSupport {
         FileWriting.isDirectory(folder.gitDirectory)
     }
 
+    /// Whether the checked-out branch tracks a remote branch, read from `.git/HEAD` and
+    /// `.git/config` without spawning git — cheap enough for the main actor (sync v2 §6.5).
+    static func hasConfiguredUpstream(_ folder: PeteKMFolder) -> Bool {
+        let refPrefix = "ref: refs/heads/"
+        guard let head = FileWriting.readText(folder.gitDirectory.appending(path: "HEAD"))?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+              head.hasPrefix(refPrefix),
+              let config = FileWriting.readText(folder.gitDirectory.appending(path: "config"))
+        else { return false }
+
+        let section = "[branch \"\(head.dropFirst(refPrefix.count))\"]"
+        var inBranch = false
+        for raw in config.split(whereSeparator: \.isNewline) {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("[") {
+                inBranch = line == section
+            } else if inBranch, line.hasPrefix("remote"),
+                      let value = line.split(separator: "=", maxSplits: 1).last,
+                      line.contains("="),
+                      !value.trimmingCharacters(in: .whitespaces).isEmpty {
+                return true
+            }
+        }
+        return false
+    }
+
     /// `git init` in the PeteKM folder. Returns false on any failure; the caller
     /// shows a plain notice and carries on.
     @discardableResult

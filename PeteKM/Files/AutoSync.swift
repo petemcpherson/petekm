@@ -151,6 +151,8 @@ final class AutoSync {
 
     @ObservationIgnored private(set) var folder: PeteKMFolder?
     @ObservationIgnored private var isEligible: Bool?
+    /// Refreshed after every run, so Pre-New-Day never shells out on the main actor (§6.5).
+    @ObservationIgnored private var hasUpstream: Bool?
     @ObservationIgnored private var inFlight = false
     @ObservationIgnored private var runAgain = false
     @ObservationIgnored private var queued: Set<Trigger> = []
@@ -192,6 +194,18 @@ final class AutoSync {
 
     func register(_ session: DailySession) {
         self.session = session
+        session.attach(self)
+    }
+
+    /// The §6.5 conditions that belong to sync: automatic sync on and an upstream to ask.
+    /// The session checks the other two (today, file missing).
+    func canDeferNewDay(in folder: PeteKMFolder) -> Bool {
+        guard settings.syncAutomatically else { return false }
+        if self.folder == folder {
+            if isEligible == false { return false }
+            if let hasUpstream { return hasUpstream }
+        }
+        return GitSupport.hasConfiguredUpstream(folder)
     }
 
     /// Called when the sticky view appears for a ready folder (§5.1 "Folder becomes ready").
@@ -247,6 +261,7 @@ final class AutoSync {
 
     private func resetRunState() {
         isEligible = nil
+        hasUpstream = nil
         pendingSince = nil
         offlineSince = nil
         pushFailedAt = nil
@@ -491,12 +506,14 @@ final class AutoSync {
 
         let paused = run.outcome == .pullConflict
         let after = await Self.offMain {
-            AfterRun(hasLocalChanges: GitSupport.hasLocalChanges(folder, runner: runner),
-                     otherDevice: run.fetchSucceeded
-                        ? GitSupport.otherDeviceLastCommit(folder, thisDevice: device, runner: runner).map { OtherDevice(name: $0.name, at: $0.at) }
-                        : nil,
-                     head: paused ? GitSupport.revision("HEAD", in: folder, runner: runner) : nil,
-                     upstream: paused ? GitSupport.revision("@{upstream}", in: folder, runner: runner) : nil)
+            let upstream = GitSupport.revision("@{upstream}", in: folder, runner: runner)
+            return AfterRun(hasLocalChanges: GitSupport.hasLocalChanges(folder, runner: runner),
+                            hasUpstream: upstream != nil,
+                            otherDevice: run.fetchSucceeded
+                                ? GitSupport.otherDeviceLastCommit(folder, thisDevice: device, runner: runner).map { OtherDevice(name: $0.name, at: $0.at) }
+                                : nil,
+                            head: paused ? GitSupport.revision("HEAD", in: folder, runner: runner) : nil,
+                            upstream: paused ? upstream : nil)
         }
 
         apply(run, after: after, previous: previous, manual: manual,
@@ -521,6 +538,7 @@ final class AutoSync {
                        manual: Bool, localOnly: Bool, attemptedRebase: Bool) {
         let time = now()
         lastRunStderr = run.stderr
+        hasUpstream = after.hasUpstream
         if run.fetchSucceeded {
             lastFetchAt = time
             offlineSince = nil
@@ -595,6 +613,7 @@ final class AutoSync {
 
     private struct AfterRun: Sendable {
         let hasLocalChanges: Bool
+        let hasUpstream: Bool
         let otherDevice: OtherDevice?
         let head: String?
         let upstream: String?

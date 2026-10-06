@@ -31,16 +31,21 @@ final class StickyDocument {
     private(set) var conflict: Conflict?
     private(set) var lastError: String?
 
+    /// Today's composed text is on screen but not yet on disk: an arrival sync may still bring
+    /// the other Mac's copy in (sync v2 §6.5). The first keystroke, or `commitDeferred()`, ends it.
+    private(set) var isDeferred: Bool
+
     var isDirty: Bool { text != savedText }
     var hasConflict: Bool { conflict != nil }
 
     private let autosaveDelay: Duration
     private var saveTask: Task<Void, Never>?
 
-    init(url: URL, text: String, autosaveDelay: Duration = .milliseconds(600)) {
+    init(url: URL, text: String, deferredCreate: Bool = false, autosaveDelay: Duration = .milliseconds(600)) {
         self.url = url
         self.text = text
         self.savedText = text
+        self.isDeferred = deferredCreate
         self.autosaveDelay = autosaveDelay
     }
 
@@ -72,22 +77,50 @@ final class StickyDocument {
         guard conflict == nil, isDirty else { return }
 
         let onDisk = FileWriting.readText(url)
-        // Someone else changed the file since our last sync: never clobber it (§19.4).
-        if let onDisk, onDisk != savedText {
+        // A deferred file that appeared meanwhile is someone else's copy, whatever it says.
+        if let onDisk, isDeferred || onDisk != savedText {
+            // Someone else changed the file since our last sync: never clobber it (§19.4).
             conflict = Conflict(diskText: onDisk)
+            isDeferred = false
             return
         }
 
-        write(text)
+        if write(text) { isDeferred = false }
     }
 
-    private func write(_ contents: String) {
+    /// Ends a deferral by writing the composed text, unless the file arrived meanwhile — then
+    /// the disk copy wins the normal way (sync v2 §6.5, timeout path).
+    func commitDeferred() {
+        guard isDeferred else { return }
+        if FileWriting.exists(url) {
+            reconcileWithDisk()
+            return
+        }
+        saveTask?.cancel()
+        saveTask = nil
+        if write(text) { isDeferred = false }
+    }
+
+    /// Swaps still-unwritten composed text for a fresher composition. No-op once the user
+    /// has typed or the file exists.
+    func recomposeDeferred(_ newText: String) {
+        guard isDeferred, !isDirty, newText != text else { return }
+        savedText = newText
+        text = newText
+        saveTask?.cancel()
+        saveTask = nil
+    }
+
+    @discardableResult
+    private func write(_ contents: String) -> Bool {
         do {
             try FileWriting.writeAtomically(contents, to: url)
             savedText = contents
             lastError = nil
+            return true
         } catch {
             lastError = error.localizedDescription
+            return false
         }
     }
 
@@ -98,8 +131,24 @@ final class StickyDocument {
         guard conflict == nil else { return }
 
         guard let onDisk = FileWriting.readText(url) else {
+            // Deferred: not written yet on purpose, so there is nothing to put back (sync v2 §6.5).
+            guard !isDeferred else { return }
             // Deleted or moved out from under us — put our copy back rather than lose it.
             if !text.isEmpty { write(text) }
+            return
+        }
+
+        if isDeferred {
+            isDeferred = false
+            guard isDirty else {
+                // The other Mac's copy arrived before any keystroke: adopt it, nothing was written.
+                text = onDisk
+                savedText = onDisk
+                saveTask?.cancel()
+                saveTask = nil
+                return
+            }
+            conflict = Conflict(diskText: onDisk)
             return
         }
 

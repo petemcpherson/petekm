@@ -28,9 +28,20 @@ final class DailySession {
     private var watcher: DirectoryWatcher?
     private var openedFileWatcher: DirectoryWatcher?
 
-    init(folder: PeteKMFolder, settings: AppSettings, calendar: Calendar = .current, now: Date = Date()) {
+    /// Absent in tests and before the view wires it: then today's file is written at once, as v1.
+    private var autoSync: AutoSync?
+    private let newDayBudget: Duration
+    /// The Pre-New-Day wait (sync v2 §6.5): the arrival run and its 2s budget.
+    private var deferralRun: Task<Void, Never>?
+    private var deferralTimeout: Task<Void, Never>?
+
+    init(folder: PeteKMFolder, settings: AppSettings, autoSync: AutoSync? = nil,
+         newDayBudget: Duration = .seconds(AutoSync.Timing.newDayBudget),
+         calendar: Calendar = .current, now: Date = Date()) {
         self.folder = folder
         self.settings = settings
+        self.autoSync = autoSync
+        self.newDayBudget = newDayBudget
         self.calendar = calendar
         self.openedDate = calendar.startOfDay(for: now)
         openToday(now: now)
@@ -68,6 +79,7 @@ final class DailySession {
         revealRange = nil
         newDayOptions = nil
         openedFileWatcher = nil
+        cancelDeferral()
 
         let url = folder.dailySticky(for: day, calendar: calendar)
         if FileWriting.exists(url) {
@@ -79,8 +91,9 @@ final class DailySession {
         case .ask:
             let options = availableNewDayOptions(for: day)
             if options.count > 1 {
-                document = nil
+                adopt(nil)
                 newDayOptions = options
+                syncWhilePrompting(for: day)
             } else {
                 create(start: options.first ?? .scratch, for: day)
             }
@@ -126,9 +139,14 @@ final class DailySession {
         return DailyDate.date(fromFilename: url.lastPathComponent, calendar: calendar)
     }
 
-    /// Answer to the New Day prompt.
+    /// Answer to the New Day prompt. Today's file may have arrived from the other Mac while
+    /// the prompt was up; then it opens instead (sync v2 §6.5 step 4).
     func startNewDay(_ start: NewDayStart) {
         newDayOptions = nil
+        if FileWriting.exists(folder.dailySticky(for: openedDate, calendar: calendar)) {
+            open(date: openedDate)
+            return
+        }
         create(start: start, for: openedDate)
     }
 
@@ -147,16 +165,15 @@ final class DailySession {
 
     private func create(start: NewDayStart, for day: Date) {
         let url = folder.dailySticky(for: day, calendar: calendar)
-        let content = NewDayComposer.content(
-            start: start,
-            date: day,
-            showDateHeading: settings.showDateHeading,
-            defaultHeaders: settings.defaultHeaders,
-            priorStickyText: start == .carryForwardHeaders
-                ? DailyFiles.priorStickyText(before: day, in: folder, calendar: calendar)
-                : nil,
-            calendar: calendar
-        )
+        let content = compose(start: start, for: day)
+
+        if shouldDeferCreate(of: url) {
+            let document = StickyDocument(url: url, text: content, deferredCreate: true)
+            adopt(document)
+            lastError = nil
+            beginDeferral(of: document, start: start, for: day)
+            return
+        }
 
         do {
             let document = try StickyDocument.open(url: url, creatingWith: content)
@@ -168,11 +185,94 @@ final class DailySession {
         }
     }
 
-    private func adopt(_ document: StickyDocument) {
+    private func compose(start: NewDayStart, for day: Date) -> String {
+        NewDayComposer.content(
+            start: start,
+            date: day,
+            showDateHeading: settings.showDateHeading,
+            defaultHeaders: settings.defaultHeaders,
+            priorStickyText: start == .carryForwardHeaders
+                ? DailyFiles.priorStickyText(before: day, in: folder, calendar: calendar)
+                : nil,
+            calendar: calendar
+        )
+    }
+
+    /// An outgoing deferred sticky was never written and is simply dropped: the next open
+    /// composes it again, so nothing is lost.
+    private func adopt(_ document: StickyDocument?) {
+        cancelDeferral()
         let outgoing = self.document
         outgoing?.saveNow()
         pruneIfBlank(outgoing)
         self.document = document
+    }
+
+    // MARK: - Pre-New-Day (sync v2 §6.5)
+
+    /// Gives the session the coordinator once the view has one.
+    func attach(_ autoSync: AutoSync) {
+        self.autoSync = autoSync
+    }
+
+    /// All four §6.5 conditions: automatic sync on, an upstream, today, and no file yet.
+    private func shouldDeferCreate(of url: URL) -> Bool {
+        guard let autoSync, openedAsToday, !FileWriting.exists(url) else { return false }
+        return autoSync.canDeferNewDay(in: folder)
+    }
+
+    /// The composed text is already on screen. The first of three events writes it or
+    /// replaces it: the run brings today's file in, the user types (autosave), or the budget ends.
+    private func beginDeferral(of document: StickyDocument, start: NewDayStart, for day: Date) {
+        let autoSync = autoSync
+        let budget = newDayBudget
+        deferralTimeout = Task { [weak self, weak document] in
+            try? await Task.sleep(for: budget)
+            guard !Task.isCancelled, let self, let document, document === self.document else { return }
+            document.commitDeferred()
+            self.deferralRun?.cancel()
+            self.deferralRun = nil
+        }
+        deferralRun = Task { [weak self, weak document] in
+            let run = await autoSync?.request(.newDay)
+            guard !Task.isCancelled, let self, let document, document === self.document else { return }
+            self.deferralTimeout?.cancel()
+            self.deferralTimeout = nil
+            self.finishDeferral(of: document, after: run, start: start, for: day)
+        }
+    }
+
+    private func finishDeferral(of document: StickyDocument, after run: GitSupport.SyncRun?,
+                                start: NewDayStart, for day: Date) {
+        guard document.isDeferred else { return }
+        document.reconcileWithDisk()                 // adopts today's file if the run brought it
+        guard document.isDeferred else { return }
+        // Carry-forward now reads the other Mac's latest sticky, not a stale one.
+        if start == .carryForwardHeaders, run?.didBringIn == true {
+            document.recomposeDeferred(compose(start: start, for: day))
+        }
+        document.commitDeferred()
+    }
+
+    /// With "Ask me each day" the prompt is the wait: sync while it is up, and if today's file
+    /// arrives before an answer, open it and drop the prompt.
+    private func syncWhilePrompting(for day: Date) {
+        let url = folder.dailySticky(for: day, calendar: calendar)
+        guard let autoSync, openedAsToday, autoSync.canDeferNewDay(in: folder) else { return }
+        deferralRun = Task { [weak self] in
+            await autoSync.request(.newDay)
+            guard !Task.isCancelled, let self, self.newDayOptions != nil,
+                  self.calendar.isDate(self.openedDate, inSameDayAs: day),
+                  FileWriting.exists(url) else { return }
+            self.open(date: day)
+        }
+    }
+
+    private func cancelDeferral() {
+        deferralRun?.cancel()
+        deferralTimeout?.cancel()
+        deferralRun = nil
+        deferralTimeout = nil
     }
 
     /// Removes a Daily Sticky that holds nothing, so a day spent entirely in Scratch — or not

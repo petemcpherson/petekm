@@ -26,7 +26,13 @@ struct DailyStickyView: View {
                 content(session)
             } else {
                 Color.clear
-                    .onAppear { session = DailySession(folder: folder, settings: settings) }
+                    .onAppear {
+                        // Sync starts first so today's sticky can wait for the other Mac's copy (sync v2 §6.5).
+                        autoSync.start(folder: folder)
+                        let session = DailySession(folder: folder, settings: settings, autoSync: autoSync)
+                        autoSync.register(session)
+                        self.session = session
+                    }
             }
         }
         .frame(minWidth: 460, minHeight: 320)

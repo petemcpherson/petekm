@@ -8,7 +8,7 @@ and point at `context/sync/spec.md`.
 - [x] **Phase 1** — Hardened git engine (process env/timeouts/stderr, guards, v2 run sequence, trailer)
 - [x] **Phase 2** — Daily union merge (`.gitattributes`) + `syncAutomatically` setting
 - [x] **Phase 3** — `AutoSync` coordinator: triggers, coalescing, back-off, `SyncStatus`
-- [ ] **Phase 4** — Pre-New-Day: deferred first write of today's Daily Sticky
+- [x] **Phase 4** — Pre-New-Day: deferred first write of today's Daily Sticky
 - [ ] **Phase 5** — Visibility: dot + popover, menu bar, Settings, notices, quit alert, Guide, docs
 
 Each phase leaves the app shippable. Manual Sync keeps working after every phase; automatic
@@ -336,59 +336,70 @@ delayed.
 
 ### 4.1 `StickyDocument` — deferred create
 
-- [ ] `init(url:text:deferredCreate:)`; `private(set) var isDeferred: Bool`.
+- [x] `init(url:text:deferredCreate:)`; `private(set) var isDeferred: Bool`.
       `savedText = composed text`, but the file does not exist yet.
-- [ ] `saveNow()` when deferred: if not dirty → do nothing. If dirty → if a file now
+- [x] `saveNow()` when deferred: if not dirty → do nothing. If dirty → if a file now
       exists on disk, raise the normal `Conflict` (never clobber); otherwise write
       `text` atomically and clear `isDeferred`.
-- [ ] `reconcileWithDisk()` when deferred — **important:** today a missing file plus
+- [x] `reconcileWithDisk()` when deferred — **important:** today a missing file plus
       non-empty text triggers `write(text)`. That must not happen while deferred, or the
       directory watcher defeats the deferral.
   - Disk missing → do nothing.
   - Disk present and not dirty → adopt disk (`text = savedText = onDisk`), clear
     `isDeferred`. Composed text discarded; nothing was written.
   - Disk present and dirty → existing conflict path.
-- [ ] `func commitDeferred()` — writes `text` if still deferred and the file is still
+- [x] `func commitDeferred()` — writes `text` if still deferred and the file is still
       missing (timeout path).
 
 ### 4.2 `DailySession`
 
-- [ ] In `create(start:for:)`: when all four §6.5 conditions hold
+- [x] In `create(start:for:)`: when all four §6.5 conditions hold
       (`syncAutomatically`, upstream exists, day is today, file missing), build a
       deferred `StickyDocument` instead of `StickyDocument.open(url:creatingWith:)`.
       "Upstream exists" comes from a cached `AutoSync.hasUpstream` (refreshed on each run);
       never shell out on the main actor here.
-- [ ] Call `autoSync.request(.newDay)` with a 2s budget (`deadline` on the run).
-- [ ] Resolve the deferral at the first of:
+- [x] Call `autoSync.request(.newDay)` with a 2s budget (`deadline` on the run).
+- [x] Resolve the deferral at the first of:
   - Run finished and brought the file in → `document.reconcileWithDisk()` (adopts).
   - First keystroke → normal autosave writes it (4.1 `saveNow`).
   - 2s elapsed, offline, or failure → `document.commitDeferred()`.
   Implement with a `Task` that awaits the run result or `Task.sleep(newDayBudget)`,
   whichever first.
-- [ ] `.ask` behavior (§6.5 step 4): when setting `newDayOptions`, also fire
+- [x] `.ask` behavior (§6.5 step 4): when setting `newDayOptions`, also fire
       `.newDay`. In `startNewDay(_:)`, re-check the file on disk: if it arrived, open it
       and skip creation. If the run is finished when the prompt appears, nothing extra.
-- [ ] Carry-forward (§6.5): composition stays immediate, so capture is not delayed. If the
+- [x] Carry-forward (§6.5): composition stays immediate, so capture is not delayed. If the
       run brings in a newer prior sticky but not today's file, and the user hasn't typed,
       recompose and replace the still-unwritten text. Guard it with the same
       "not dirty, still deferred" check.
-- [ ] `pruneIfBlank`: a deferred document has no file, so `readText` is nil and it returns
+- [x] `pruneIfBlank`: a deferred document has no file, so `readText` is nil and it returns
       early — no change needed; add a test.
-- [ ] `handleActivation` day rollover → `openToday` → same deferred path.
-- [ ] `AutoSync.register(session)` gives `DailySession` the `autoSync` reference; when no
+- [x] `handleActivation` day rollover → `openToday` → same deferred path.
+- [x] `AutoSync.register(session)` gives `DailySession` the `autoSync` reference; when no
       `AutoSync` is attached (tests, toggle off), behave exactly as today.
 
 ### 4.3 Tests (`DailyStickyTests` + `GitSyncTests`)
 
-- [ ] Incoming today's file, no keystroke → disk version adopted, composed text discarded,
+- [x] Incoming today's file, no keystroke → disk version adopted, composed text discarded,
       no write happened before the arrival (assert file mtime/contents equal the pulled one).
-- [ ] Keystroke before arrival → composed text + keystroke written immediately.
-- [ ] Timeout (fake run never completes) → composed text written at 2s.
-- [ ] Offline result → written immediately.
-- [ ] Directory-watcher reconcile while deferred and disk missing → no write.
-- [ ] Toggle off / no upstream / past date → immediate write as today.
-- [ ] `.ask`: file arrives while prompt is showing → answering opens the arrived file.
-- [ ] Blank deferred sticky left for another day → no file on disk.
+- [x] Keystroke before arrival → composed text + keystroke written immediately.
+- [x] Timeout (fake run never completes) → composed text written at 2s.
+- [x] Offline result → written immediately.
+- [x] Directory-watcher reconcile while deferred and disk missing → no write.
+- [x] Toggle off / no upstream / past date → immediate write as today.
+- [x] `.ask`: file arrives while prompt is showing → answering opens the arrived file.
+- [x] Blank deferred sticky left for another day → no file on disk.
+
+Decisions made during implementation:
+
+- `DailyStickyView` starts `AutoSync` and passes it to `DailySession(…, autoSync:)` before
+  the first `openToday`, so the launch open can defer too (registering later would miss it).
+- Before the first run has cached `hasUpstream`, `GitSupport.hasConfiguredUpstream` reads
+  `.git/HEAD` + `.git/config` directly — no process on the main actor.
+- A deferred, never-written sticky that is navigated away from (another date, a Library file)
+  is dropped, like a blank one; reopening composes it again.
+- With `.ask`, when the run brings today's file in while the prompt is still up, the prompt
+  closes and the file opens without waiting for an answer (§6.5 step 4, "skip the prompt").
 
 **Done when:** two clones opening the same new day in sequence end with one shared
 sticky and no union merge needed when both are online.
