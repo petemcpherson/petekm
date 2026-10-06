@@ -19,7 +19,7 @@ Requires macOS 26.2 or later.
 
 ```bash
 brew tap petemcpherson/petekm https://github.com/petemcpherson/petekm
-brew install --cask petekm
+brew install --cask petemcpherson/petekm/petekm
 ```
 
 Update with `brew upgrade`.

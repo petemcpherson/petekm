@@ -1,87 +1,188 @@
 # Distribution & Updates
 
-Spec §20.1–§20.2. PeteKM ships **outside** the Mac App Store, through **Homebrew only**:
+Spec §20.1–§20.2. PeteKM ships **outside** the Mac App Store, through **Homebrew only**. Everything lives in one public repo, `github.com/petemcpherson/petekm`:
 
-- the source lives in the **public** repo `github.com/petemcpherson/petekm`;
-- each release is a Developer ID–signed, notarized `.dmg` attached to a **GitHub Release** in that same repo;
-- the Homebrew cask lives in the same repo (`Casks/petekm.rb`). There is no separate tap repo;
-- users update with `brew upgrade`. There is no in-app updater (see "Sparkle (deferred)" below).
+- **Source code.**
+- **Releases.** Each release is a Developer ID–signed, notarized `.dmg` attached to a GitHub Release.
+- **Homebrew cask.** `Casks/petekm.rb` in this repo acts as the tap. There is no separate `homebrew-petekm` repo.
 
-Everything lives in one repo.
+Users update with `brew upgrade`. There is no in-app updater (see "Sparkle (deferred)").
+
+**Coming back after a break? Read "Ship a new release" first.** It is the whole job. The rest of this file is reference.
 
 ---
 
-## Current state checklist (as of 2026-10-06)
+# Ship a new release
 
-| Item | Status |
-| --- | --- |
-| Paid Apple Developer account | Done |
-| `Developer ID Application: Peter McPherson` certificate in keychain | Done |
-| `Config/Local.xcconfig` with `PETEKM_DEVELOPMENT_TEAM` | Done |
-| Build settings: hardened runtime on, sandbox off, bundle ID `com.petekm.PeteKM` | Done |
-| `scripts/release.sh` (archive → export → DMG → notarize → staple) | Done |
-| `petekm-notary` notarytool keychain profile | Done (A3) |
-| `LICENSE` (MIT), `README.md`, hardcoded-path fix | Done (A1) |
-| `Casks/petekm.rb` | Created (A4, by Claude). `sha256` is a placeholder until B4 |
-| Personal-content skim of `context/` | Done (A1.4) |
-| Repo public | Done (A2) |
+About 20 minutes, most of it waiting on tests and Apple's notary service. Run every command from the repo root.
 
-Build settings already in `project.pbxproj`:
+## 0. Pre-flight (30 seconds)
+
+These are the things that silently expire or go missing between releases:
+
+```bash
+# Signing certificate present and not expired (current one expires Feb 2031)
+security find-certificate -c "Developer ID Application" -p | openssl x509 -noout -enddate
+
+# Notary credential works (an empty list or a history is fine; an error is not)
+xcrun notarytool history --keychain-profile petekm-notary | head -5
+
+# Team ID file exists (gitignored, per machine)
+cat Config/Local.xcconfig
+
+# Logged in to GitHub CLI
+gh auth status
+
+# What was the last release? You need its version and build number.
+gh release list -R petemcpherson/petekm --limit 3
+```
+
+If any of these fail, see "New Mac or broken credentials" below. Also make sure the paid Apple Developer membership hasn't lapsed (<https://developer.apple.com/account>); notarization fails without it.
+
+## 1. Pick the numbers
+
+Look at the **Release log** at the bottom of this file.
+
+- **Version** (`MARKETING_VERSION`, what users see): bump it semver-style. Bug fixes only: `1.0.0` → `1.0.1`. New features: `1.0.0` → `1.1.0`.
+- **Build** (`CURRENT_PROJECT_VERSION`): the previous build number + 1. It never goes down and never repeats.
+
+You don't edit these in Xcode. `release.sh` stamps both into the build. The `1.0`/`1` values in `project.pbxproj` only affect Debug builds.
+
+Set them once for the rest of this runbook:
+
+```bash
+V=1.0.1   # new version
+B=2       # new build number
+```
+
+## 2. Clean tree + tests
+
+1. **Quit PeteKM** (⌘Q), including the Homebrew-installed copy and any Debug build from Xcode. If a copy is running, the UI test `testClosingTheWindowHidesTheAppWithoutQuitting` fails after 60 seconds.
+2. Run:
+
+```bash
+git status                      # clean, on main, pushed
+xcodebuild -scheme PeteKM test  # must be green
+```
+
+3. **If `sameDayStickyOnTwoMacsKeepsEveryLine()` is the only failure**, rerun it alone. If it passes alone, carry on. It is timing-sensitive under the full parallel suite and is not a release blocker. Any *other* failing test is a blocker.
+
+```bash
+xcodebuild -scheme PeteKM test "-only-testing:PeteKMTests/sameDayStickyOnTwoMacsKeepsEveryLine()"
+```
+
+Tests are a manual gate only. `release.sh` does not run them.
+
+## 3. Build, sign, notarize
+
+```bash
+export DEVELOPMENT_TEAM=$(sed -n 's/^PETEKM_DEVELOPMENT_TEAM *= *//p' Config/Local.xcconfig)
+scripts/release.sh "$V" "$B"
+spctl -a -t open --context context:primary-signature -v "build/PeteKM-$V.dmg"   # must say "accepted"
+```
+
+Output: `build/PeteKM-$V.dmg`, signed, notarized and stapled. Notarization usually takes 1–10 minutes. Ignore the script's last line about Sparkle and the appcast; it doesn't apply while Sparkle is deferred.
+
+Optional smoke test: open the DMG, drag the app somewhere temporary, launch it, and click around before publishing.
+
+## 4. Publish the GitHub Release
+
+```bash
+git tag "v$V" && git push origin "v$V"
+gh release create "v$V" "build/PeteKM-$V.dmg" --title "PeteKM $V" --notes "What changed, in a line or two."
+```
+
+Use `--generate-notes` instead of `--notes` for an automatic list of commits since the last tag.
+
+Naming is load-bearing. The tag **must** be `v<version>` and the file **must** be `PeteKM-<version>.dmg`, because the cask builds its download URL from those.
+
+## 5. Update the cask
+
+```bash
+shasum -a 256 "build/PeteKM-$V.dmg"
+```
+
+In `Casks/petekm.rb`, change only two lines: `version "<V>"` and `sha256 "<that hash>"`. Add a row to the **Release log** at the bottom of this file. Then:
+
+```bash
+git add Casks/petekm.rb context/DISTRIBUTION.md
+git commit -m "Release $V"
+git push
+```
+
+Once this push lands on `main`, `brew upgrade` delivers the new version to everyone.
+
+## 6. Verify the upgrade path
+
+On your own Mac, which still has the previous version installed through brew:
+
+```bash
+brew update
+brew upgrade --cask petekm
+brew audit --cask --strict petemcpherson/petekm/petekm
+open -a PeteKM          # About PeteKM should show the new version; no Gatekeeper warning
+```
+
+If the upgrade doesn't see the new version, check that step 5 was pushed to `main`, then run `brew update` again.
+
+Done.
+
+---
+
+# How the pieces fit
+
+```
+Xcode project ──release.sh──▶ build/PeteKM-<v>.dmg (signed + notarized)
+                                     │
+                         gh release create v<v>
+                                     ▼
+          GitHub Release v<v>  ◀── download URL ──  Casks/petekm.rb (version + sha256)
+                                                          │
+                                         brew tap / brew upgrade reads it from main
+```
+
+| Thing | Where | Committed? |
+| --- | --- | --- |
+| Release script | `scripts/release.sh` | Yes |
+| Homebrew cask | `Casks/petekm.rb` | Yes |
+| Team ID | `Config/Local.xcconfig` (`PETEKM_DEVELOPMENT_TEAM`) | No, gitignored, per Mac |
+| Signing certificate + private key | login keychain, "Developer ID Application: Peter McPherson" | No |
+| Notary credential | login keychain, profile `petekm-notary` | No |
+| Build output | `build/` (wiped on each `release.sh` run) | No |
+
+Build settings in `project.pbxproj` that distribution depends on:
 
 | Setting | Value | Why |
 | --- | --- | --- |
 | `ENABLE_APP_SANDBOX` | `NO` | The app shells out to `git`, `code`, and Terminal (§12, §15, §17). |
 | `ENABLE_HARDENED_RUNTIME` | `YES` | Required for notarization. |
 | `ENABLE_USER_SELECTED_FILES` | `readwrite` | The PeteKM folder is user-chosen and written to. |
-| `PRODUCT_BUNDLE_IDENTIFIER` | `com.petekm.PeteKM` | Stable app identity. Never change it after release. |
-| `MACOSX_DEPLOYMENT_TARGET` | `26.2` | Only Macs on macOS 26.2+ can install. Lower it if you want a wider audience. |
+| `PRODUCT_BUNDLE_IDENTIFIER` | `com.petekm.PeteKM` | Stable app identity. **Never change it.** |
+| `MACOSX_DEPLOYMENT_TARGET` | `26.2` | Only macOS 26.2+ can install. If you lower it, also change `depends_on macos:` in the cask. |
 
 ---
 
-# Part A: One-time setup
+# New Mac or broken credentials
 
-Do these in order. Steps marked **✅ Done** were completed by Claude on 2026-10-06. Those changes are in the working tree but **not committed yet**: review them, then commit and push before A2.
+The repo has everything except three per-machine secrets. On a new Mac (or if pre-flight fails), restore whichever is missing.
 
-## A1. Pre-public cleanup ✅ Done (except item 4)
+## Signing certificate
 
-1. ✅ **`LICENSE`** added at the repo root: MIT, "Copyright (c) 2026 Pete McPherson". Anyone may use, modify and redistribute.
-2. ✅ **Hardcoded home path removed** from `context/design-system/gen-appicon-layer.py:2`. `ROOT` is now derived from the script's own location.
-3. ✅ **`README.md`** added. It covers what PeteKM is, features, the brew install commands, building from source and the license. Optional: add a screenshot (for example `docs/screenshot.png`, referenced from the README).
-4. ✅ **You: skim `context/`** (spec, design, plans) for anything you would not want public. Claude's scans of the full history (2026-10-06) found no credentials, keys, phone numbers or street addresses. A human read is still the only check for personal anecdotes.
+- **Moving Macs:** on the old Mac, open Keychain Access, find "Developer ID Application: Peter McPherson", expand it so the private key shows, select both, then File → Export Items as `.p12`. Double-click the `.p12` on the new Mac.
+- **Lost or expired:** Xcode → Settings → Accounts → your team → Manage Certificates → + → Developer ID Application. Apple allows only a few of these per account; revoke stale ones at <https://developer.apple.com/account/resources/certificates>.
 
-✅ Then commit and push:
+## `Config/Local.xcconfig`
 
-```bash
-git add LICENSE README.md Casks/petekm.rb context/
-git commit -m "Prepare for public release: license, README, Homebrew cask"
-git push
+```
+PETEKM_DEVELOPMENT_TEAM = <TEAMID>
 ```
 
-## A2. Make the repo public ✅
+The Team ID is at <https://developer.apple.com/account> → Membership details.
 
-Optional first: hide your personal email on future commits. On GitHub, go to Settings → Emails, then turn on "Keep my email addresses private". Copy the `…@users.noreply.github.com` address it shows, then run:
+## Notary credential (`petekm-notary`)
 
-```bash
-git config user.email "<id>+petemcpherson@users.noreply.github.com"
-```
-
-Existing commits keep `pnm326@gmail.com`. That is fine to leave.
-
-Flip visibility:
-
-```bash
-gh repo edit petemcpherson/petekm --visibility public --accept-visibility-change-consequences
-```
-
-Treat this as permanent. Clones and forks of a public repo can't be recalled.
-
-## A3. Create the notarization keychain profile ✅
-
-`release.sh` notarizes using a stored credential named `petekm-notary`.
-
-1. Create an **app-specific password**: go to <https://account.apple.com>, open Sign-In and Security → App-Specific Passwords, and click +. Name it "petekm-notary".
-2. Find your **Team ID**: <https://developer.apple.com/account> → Membership details. It is the same value as `PETEKM_DEVELOPMENT_TEAM` in `Config/Local.xcconfig`.
-3. Store it (one time; the password goes into your login keychain):
+1. Create an **app-specific password**: <https://account.apple.com> → Sign-In and Security → App-Specific Passwords → +. Name it "petekm-notary".
+2. Store it in the keychain:
 
 ```bash
 xcrun notarytool store-credentials petekm-notary \
@@ -90,134 +191,19 @@ xcrun notarytool store-credentials petekm-notary \
   --password "<app-specific password>"
 ```
 
-4. Verify with `xcrun notarytool history --keychain-profile petekm-notary`. It should print an empty history, not an error.
+3. Verify: `xcrun notarytool history --keychain-profile petekm-notary` prints a history, not an error.
 
-## A4. Homebrew cask in this repo ✅ Done
-
-Homebrew can tap any git repo when you give it the URL explicitly. The tap only has to contain a `Casks/` folder, so no `homebrew-petekm` repo is needed.
-
-`Casks/petekm.rb` now contains the following. Its `sha256` is a placeholder until the first release (B4):
-
-```ruby
-cask "petekm" do
-  version "1.0.0"
-  sha256 "REPLACE_WITH_SHA256_OF_RELEASE_DMG"
-
-  url "https://github.com/petemcpherson/petekm/releases/download/v#{version}/PeteKM-#{version}.dmg"
-  name "PeteKM"
-  desc "Markdown daily notes and personal library"
-  homepage "https://github.com/petemcpherson/petekm"
-
-  livecheck do
-    url :url
-    strategy :github_latest
-  end
-
-  depends_on macos: ">= :tahoe"
-
-  app "PeteKM.app"
-
-  zap trash: [
-    "~/Library/Application Support/PeteKM",
-    "~/Library/Caches/com.petekm.PeteKM",
-    "~/Library/Preferences/com.petekm.PeteKM.plist",
-  ]
-end
-```
-
-Notes:
-- The cask has no `auto_updates true`, so plain `brew upgrade` updates PeteKM. Add that line only if Sparkle is ever added.
-- `zap` only removes app support files. It never touches the user's PeteKM folder of notes.
-- The trade-off of tapping the main repo: `brew tap` clones the whole repo (~3 MB today). That's fine.
+Changing your Apple ID password revokes all app-specific passwords. Redo this section if that happens.
 
 ---
 
-# Part B: Every release
+# What users run
 
-Example values: version `1.0.0`, build `1`. Increase the build number every release.
-
-## B1. Prepare
-
-1. **Quit PeteKM** (⌘Q), including any Debug build launched from Xcode. The UI tests have to quit the app before they start. If a copy is already running, `testClosingTheWindowHidesTheAppWithoutQuitting` fails after 60 seconds.
-2. Check the tree, then run the tests:
-
-```bash
-git status                      # clean, on main, pushed
-xcodebuild -scheme PeteKM test  # green
-```
-
-3. **If `sameDayStickyOnTwoMacsKeepsEveryLine()` is the only failure**, rerun it on its own:
-
-```bash
-xcodebuild -scheme PeteKM test "-only-testing:PeteKMTests/sameDayStickyOnTwoMacsKeepsEveryLine()"
-```
-
-If it passes alone, carry on. This test is timing-sensitive when the full suite runs many git tests in parallel. It passes reliably on its own, so a failure in the full run is not a release blocker. Any *other* failing test is a blocker.
-
-Tests are a manual gate only. `release.sh` never runs them, so a failing test can't break a build or a release.
-
-## B2. Build, sign, notarize
-
-```bash
-DEVELOPMENT_TEAM=<TEAMID> scripts/release.sh 1.0.0 1
-```
-
-Use the same Team ID as `Config/Local.xcconfig`, or export `DEVELOPMENT_TEAM` in your shell profile.
-
-Output: `build/PeteKM-1.0.0.dmg`, signed, notarized and stapled. Notarization usually takes 1–10 minutes.
-
-Sanity check:
-
-```bash
-spctl -a -t open --context context:primary-signature -v build/PeteKM-1.0.0.dmg   # "accepted"
-```
-
-## B3. Publish the GitHub Release
-
-```bash
-git tag v1.0.0 && git push origin v1.0.0
-gh release create v1.0.0 build/PeteKM-1.0.0.dmg --title "PeteKM 1.0.0" --notes "First public release."
-```
-
-The DMG URL is now `https://github.com/petemcpherson/petekm/releases/download/v1.0.0/PeteKM-1.0.0.dmg`, which matches the cask `url` pattern. The tag must be `v<version>` and the file must be named `PeteKM-<version>.dmg`.
-
-## B4. Update the cask
-
-```bash
-shasum -a 256 build/PeteKM-1.0.0.dmg
-```
-
-In `Casks/petekm.rb`, set `version "1.0.0"` and `sha256 "<that hash>"`. Then:
-
-```bash
-git add Casks/petekm.rb
-git commit -m "Release 1.0.0"
-git push
-```
-
-Once this push lands, `brew upgrade` delivers the new version to existing users.
-
-## B5. Verify
-
-```bash
-brew untap petemcpherson/petekm 2>/dev/null
-brew tap petemcpherson/petekm https://github.com/petemcpherson/petekm
-brew audit --cask --strict petemcpherson/petekm/petekm   # style/URL checks
-brew install --cask petekm
-open -a PeteKM
-```
-
-The app should open with no Gatekeeper warning. From the second release on, also test the upgrade path: keep the previous version installed, push the new cask, then run `brew update && brew upgrade petekm`.
-
----
-
-# Part C: What users run
-
-Install (the tap line runs once; it needs the full URL because the repo isn't named `homebrew-petekm`):
+Install. The tap line runs once. It needs the full URL because the repo isn't named `homebrew-petekm`. Homebrew 7 refuses casks from third-party taps until they are trusted. Installing by the fully qualified name (`petemcpherson/petekm/petekm`) trusts the cask automatically. A bare `brew install --cask petekm` fails with `Refusing to load cask … from untrusted tap`.
 
 ```bash
 brew tap petemcpherson/petekm https://github.com/petemcpherson/petekm
-brew install --cask petekm
+brew install --cask petemcpherson/petekm/petekm
 ```
 
 Update:
@@ -227,6 +213,28 @@ brew upgrade
 ```
 
 The DMG on the Releases page also works for a manual install, but those users get no update notices. Advertise the brew commands.
+
+---
+
+# Release log
+
+Add a row every release. The build number must always increase.
+
+| Version | Build | Date | Notes |
+| --- | --- | --- | --- |
+| 1.0.0 | 1 | 2026-10-06 | First public release. |
+
+---
+
+# History: first-time setup (done 2026-10-06)
+
+Recorded for reference. None of this needs redoing for a normal release.
+
+1. **Pre-public cleanup.** Added `LICENSE` (MIT, "Copyright (c) 2026 Pete McPherson") and `README.md`. Removed a hardcoded home path from `context/design-system/gen-appicon-layer.py`. Scanned the full git history and `context/` for credentials and personal content.
+2. **Made the repo public:** `gh repo edit petemcpherson/petekm --visibility public --accept-visibility-change-consequences`. Older commits carry `pnm326@gmail.com`; to hide it on new commits, turn on "Keep my email addresses private" on GitHub and set `git config user.email` to the `…@users.noreply.github.com` address.
+3. **Created the `petekm-notary` keychain profile** (see "New Mac or broken credentials").
+4. **Wrote `Casks/petekm.rb`.** Homebrew can tap any git repo given its URL, as long as the repo has a `Casks/` folder. Trade-off: `brew tap` clones the whole repo (~3 MB). The cask has no `auto_updates true`, so plain `brew upgrade` updates PeteKM; add that line only if Sparkle is added. `zap` removes only app support files, never the user's PeteKM notes folder.
+5. **Released 1.0.0** with the runbook above and verified a clean `brew install` on the dev Mac.
 
 ---
 
@@ -246,10 +254,10 @@ Sparkle (<https://sparkle-project.org>) is the standard in-app auto-updater for 
    - `SUEnableAutomaticChecks`: `true`
 
    Set the PeteKM target's `INFOPLIST_FILE` to `Config/Info.plist` and keep `GENERATE_INFOPLIST_FILE = YES`. `INFOPLIST_KEY_*` build settings can't hold these custom keys.
-4. Each release:
+4. Each release, after step 3 of the runbook:
    1. Run `~/Tools/Sparkle/bin/sign_update build/PeteKM-<v>.dmg`. It prints `edSignature` and `length`.
    2. Add an `<item>` to `appcast.xml` at the repo root. Fill in `sparkle:version` (the build number), `sparkle:shortVersionString`, `sparkle:minimumSystemVersion` 26.2, and an `enclosure` with the Release DMG URL plus the signature and length from step 1.
-   3. Commit `appcast.xml`.
+   3. Commit `appcast.xml` with the cask change.
 5. Add `auto_updates true` to the cask.
 
 ---
@@ -257,7 +265,7 @@ Sparkle (<https://sparkle-project.org>) is the standard in-app auto-updater for 
 # Later (optional)
 
 - **Official `homebrew/cask`.** When PeteKM is notable enough, submit a PR so users can run plain `brew install --cask petekm` without tapping. Homebrew requires meaningful GitHub stars, forks and watchers, with a higher bar for self-submitted apps. Then delete `Casks/` from this repo.
-- **Automate B3–B4.** Extend `release.sh` to call `gh release create` and rewrite the cask's `version`/`sha256`.
+- **Automate steps 4–5.** Extend `release.sh` to call `gh release create` and rewrite the cask's `version`/`sha256`.
 
 ---
 
@@ -265,9 +273,13 @@ Sparkle (<https://sparkle-project.org>) is the standard in-app auto-updater for 
 
 | Symptom | Cause / fix |
 | --- | --- |
-| `No Keychain password item found for profile: petekm-notary` | A3 not done, or done on a different Mac. |
+| `No Keychain password item found for profile: petekm-notary` | Notary credential missing on this Mac, or revoked by an Apple ID password change. See "New Mac or broken credentials". |
+| `release.sh` fails at archive/export with a signing error | Developer ID certificate missing or expired, or `DEVELOPMENT_TEAM` empty. Run the pre-flight checks. |
 | Notarization "Invalid" | Run `xcrun notarytool log <submission-id> --keychain-profile petekm-notary`. It is usually an unsigned nested binary or hardened runtime turned off. |
+| Notarization rejected for agreements/membership | Apple Developer membership lapsed or a new agreement needs accepting at <https://developer.apple.com/account>. |
+| UI tests hang ~60 s then fail | PeteKM is running. Quit every copy and rerun. |
 | `brew install` SHA mismatch | The cask `sha256` came from a different DMG than the one on the Release. Recompute it from the uploaded file. |
+| `Refusing to load cask … from untrusted tap` | The install used the bare name. Run `brew install --cask petemcpherson/petekm/petekm` instead, which trusts the cask. Alternatively, run `brew trust petemcpherson/petekm` once. |
 | `brew install` 404 | The tag isn't `v<version>`, or the DMG filename doesn't match `PeteKM-<version>.dmg`. |
 | `brew upgrade` doesn't see the new version | The user needs `brew update` first, which normally runs automatically. Also check that the cask commit was pushed to `main`. |
 | Gatekeeper warns on first launch | The DMG wasn't notarized or stapled. Re-run `release.sh` and check the `stapler validate` output. |
