@@ -57,7 +57,7 @@ git commit -m "Prepare for public release: license, README, Homebrew cask"
 git push
 ```
 
-## A2. Make the repo public
+## A2. Make the repo public ✅
 
 Optional first: hide your personal email on future commits. On GitHub, go to Settings → Emails, then turn on "Keep my email addresses private". Copy the `…@users.noreply.github.com` address it shows, then run:
 
@@ -75,7 +75,7 @@ gh repo edit petemcpherson/petekm --visibility public --accept-visibility-change
 
 Treat this as permanent. Clones and forks of a public repo can't be recalled.
 
-## A3. Create the notarization keychain profile
+## A3. Create the notarization keychain profile ✅
 
 `release.sh` notarizes using a stored credential named `petekm-notary`.
 
