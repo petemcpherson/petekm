@@ -15,6 +15,8 @@ real detail lives.
 | `context/plan.md` | 7-phase implementation plan. All phases complete. | ~210L |
 | `context/sync/spec.md` | Two-way sync + unified `/petekm-process`. **Supersedes `spec.md` §17 in full**; amends §12–§15 wherever they name `Git Sync` or the old per-date process skills. | ~260L |
 | `context/sync/plan.md` | Sync implementation plan + manual testing checklist. Implemented. | ~394L |
+| `context/sync-v2/spec.md` | Automatic sync across devices: triggers, the hardened run, `daily/` union merge, Pre-New-Day, status dot/menu/quit alert. **Supersedes `context/sync/spec.md` §4.2** (manual-only) while "Sync automatically" is on. | ~470L |
+| `context/sync-v2/plan.md` | Sync v2 implementation plan (5 phases) + manual two-Mac checklist. Implemented. | ~520L |
 | `context/ACCEPTANCE.md` | Criterion → code → test mapping (spec §24, §22). Best "does X exist?" lookup. | ~100L |
 | `context/DISTRIBUTION.md` | Signing, notarization, Sparkle, `scripts/release.sh`. | ~57L |
 | `context/design-system/` | Tokens + pixel-art mark assets (`robopete*.png/svg`, `robopete.grid.json` — internal filenames only, no user-facing name). | — |
@@ -69,7 +71,7 @@ Targets: `PeteKM` (app), `PeteKMTests` (**Swift Testing** — `@Test`/`#expect`)
 | `Search/` | Disposable full-text index, fuzzy match, ranking |
 | `Settings/` | Preferences model + tabbed Settings window + Sparkle |
 | `DesignSystem/` | `DS` tokens, PixelMark/Wordmark |
-| `Assets.xcassets/` | App icon, `PixelMark` imageset |
+| `Assets.xcassets/` | App icon, `PixelMark` imageset, `PixelMarkBadge` (menu-bar glyph with a sync badge dot) |
 
 ---
 
@@ -80,11 +82,11 @@ Targets: `PeteKM` (app), `PeteKMTests` (**Swift Testing** — `@Test`/`#expect`)
 
 | File | Role |
 | --- | --- |
-| `AppDelegate.swift` | Background-resident lifecycle. Builds `RootView`, owns window controller, hotkey monitor, menu-bar item. `applicationShouldTerminateAfterLastWindowClosed → false` (§8.7). Keyboard ⌘Q hides instead of quitting (`applicationShouldTerminate`); mouse Quit, logout, and Sparkle still quit. |
-| `AppServices.swift` | `AppServices.shared` — the long-lived stores (`FolderStore`, `AppSettings`, `SyncLaunchCheck`). Honors `PETEKM_UITEST_FOLDER` env var to run against a scratch folder. |
+| `AppDelegate.swift` | Background-resident lifecycle. Builds `RootView`, owns window controller, hotkey monitor, menu-bar item. `applicationShouldTerminateAfterLastWindowClosed → false` (§8.7). Keyboard ⌘Q hides instead of quitting (`applicationShouldTerminate`); mouse Quit, logout, and Sparkle still quit — after a 5s departure sync, and a user-chosen Quit with notes still unsent gets one alert (sync v2 §9.2; `isSystemQuit` reads the quit reason). Mirrors `AutoSync` status into the menu bar. |
+| `AppServices.swift` | `AppServices.shared` — the long-lived stores (`FolderStore`, `AppSettings`, `SyncLaunchCheck`, `AutoSync`). Honors `PETEKM_UITEST_FOLDER` env var to run against a scratch folder. |
 | `StickyWindowController.swift` | One sticky window. `summon()`, float-on-top, hide-not-close (§8.6). Owns the app's `Notification.Name` events, including `.peteKMSummonWindow` (Settings lives in its own window, so an action there must summon the sticky). |
 | `GlobalHotKeyMonitor.swift` + `KeyCombo.swift` | System-wide show/hide shortcut (§8.2). Needs Accessibility permission. |
-| `MenuBarController.swift` | Menu-bar item; visibility rule paired with dock-icon setting (§8.8). |
+| `MenuBarController.swift` | Menu-bar item; visibility rule paired with dock-icon setting (§8.8). While automatic sync is on: a disabled status row + **Sync Now** at the top, and the `PixelMarkBadge` glyph when the window dot would show. |
 | `ShortcutRecorder.swift` | SwiftUI key-combo recorder used in Settings. |
 | `RootView.swift` | Switches on `FolderStore.State`: `.unset` → onboarding, `.missing` → recovery, `.ready` → `DailyStickyView`. |
 
@@ -99,7 +101,9 @@ Targets: `PeteKM` (app), `PeteKMTests` (**Swift Testing** — `@Test`/`#expect`)
 | `AgentTemplates.swift` | ~480L of template strings the app writes into a user's folder: `INDEX.md`, `CLAUDE.md`, `AGENTS.md`, `.gitignore`, state, and 5 skills. **Editing these is a product-content change, not an app change.** |
 | `DirectoryWatcher.swift` | FSEvents/DispatchSource watcher; drives external-change detection and index refresh. |
 | `GitSupport.swift` | Shells out to `git`. Two-way Sync: commit → fetch → pull --rebase when behind → push (`context/sync/spec.md` §5.1). Never force-pushes; a conflicting rebase is aborted and reported. `SyncOutcome` enum where every case is survivable, each with a plain `notice(editorName:)` string. `aheadBehind(_:)` parses `rev-list --left-right --count` and returns nil without an upstream. |
-| `SyncLaunchCheck.swift` | `@Observable`, once per app process: fetch, compare with `aheadBehind`, and show the dismissible "Changes to sync." banner only when `ahead > 0 || behind > 0`. Every failure — no git, not a repository, no upstream, unreachable remote — is silent (`context/sync/spec.md` §4.3). |
+| `AutoSync.swift` | Sync v2 coordinator (`context/sync-v2/`). `@MainActor @Observable`. One entry point, `request(_ trigger:)`: arrival (folder ready, wake, summon, network regained, 5-min presence poll, new day) and departure (hide, 60s edit idle, sleep, quit) triggers, coalesced to one follow-up run, with back-off for offline / push failure / conflict pause. Publishes `SyncStatus`, `statusClock` (30s tick), `otherDeviceLast`, `lastRunStderr`, one-shot `lastNotice`. Off → v1 manual behavior. |
+| `SyncStatusCopy.swift` | Pure copy for `SyncStatus`: `line(now:)` (§8.4), `dot(now:)` with the 2-minute rule (§8.1), `SyncTime.phrase` (relative / clock / date), `otherDeviceLine`, and the earlier-notes condition (§9.2.3). |
+| `SyncLaunchCheck.swift` | Only while "Sync automatically" is off. `@Observable`, once per app process: fetch, compare with `aheadBehind`, and show the dismissible "Changes to sync." banner only when `ahead > 0 || behind > 0`. Every failure — no git, not a repository, no upstream, unreachable remote — is silent (`context/sync/spec.md` §4.3). |
 
 ### Generated folder shape
 
@@ -113,6 +117,7 @@ INDEX.md   CLAUDE.md   AGENTS.md   INBOX.md
 .petekm-state.json           disposable agent state
 .petekm-scratch.md           Scratch pane; not a note (see Layer 3b)
 .gitignore
+.gitattributes               daily/*.md merge=union (sync v2 §7)
 ```
 
 ### State outside the folder
@@ -150,6 +155,7 @@ The capture loop. Read `DailySession` first.
 | `NewDayComposer.swift` | `NewDayStart` = `.scratch / .carryForwardHeaders / .defaultHeaders`; builds the opening text (§7.2–7.6). |
 | `NewDayPrompt.swift` | The tiny "ask each day" prompt (§7.3). |
 | `MarkdownHeadings.swift` | Heading parse used by carry-forward. |
+| `SyncStatusDot.swift` | The window's 6pt sync dot (top-trailing) and its popover: status line, other-Mac line, **Sync Now**, **Details…** (last run's stderr — the only place git output appears). |
 | `DailyStickyView.swift` | Main screen. Wires `DailySession` + `EditorController` + `PaletteModel` + `ScratchStore`, paints the window background, hosts the conflict alert, TOC, the transient notice line, and the dismissible "Changes to sync." row from `SyncLaunchCheck` (no counts, no git words). |
 
 ## Layer 3b — Scratch (`PeteKM/Scratch/`)
@@ -216,10 +222,10 @@ Custom `NSTextView`, not `TextEditor`. Syntax markers stay on screen.
 
 | File | Role |
 | --- | --- |
-| `AppSettings.swift` | `@Observable`, `UserDefaults`-backed. Keys are namespaced `petekm.*`: `dailyStartBehavior`, `defaultHeaders`, `showDateHeading`, `globalShortcut`, `hasCompletedOnboarding`, `editorFontName/Size/LineSpacing`, `showTableOfContents`, `autoClosePairs`, `continueListMarkers`, `scratchVisible`, `scratchHeight`, `floatOnTop`, `hideDockIcon`, `hideMenuBarItem`, `agentFilesNoticeShownFor`, `automaticUpdateChecks`, `backgroundHex`, `backgroundOpacity`, `textHex` (window color/transparency + editor text color, all in the Editor tab; `HexColor` parser lives here; window is non-opaque, `DailyStickyView` paints the background). **No AI settings exist, now or later (§18.8).** |
+| `AppSettings.swift` | `@Observable`, `UserDefaults`-backed. Keys are namespaced `petekm.*`: `dailyStartBehavior`, `defaultHeaders`, `showDateHeading`, `globalShortcut`, `hasCompletedOnboarding`, `editorFontName/Size/LineSpacing`, `showTableOfContents`, `autoClosePairs`, `continueListMarkers`, `scratchVisible`, `scratchHeight`, `floatOnTop`, `hideDockIcon`, `hideMenuBarItem`, `syncAutomatically`, `agentFilesNoticeShownFor`, `automaticUpdateChecks`, `backgroundHex`, `backgroundOpacity`, `textHex` (window color/transparency + editor text color, all in the Editor tab; `HexColor` parser lives here; window is non-opaque, `DailyStickyView` paints the background). **No AI settings exist, now or later (§18.8).** |
 | `SettingsView.swift` | Tabs: General, Daily Sticky (incl. Scratch), Editor (+ Folder, Guide, Updates panes). |
-| `FolderSettingsView.swift` | Change folder, Refresh Agent Files, Git: Initialize Repository / Set Remote / Sync (§18.9). |
-| `GuideSettingsView.swift` | In-app explanation of the daily/library contract, plus **Show Onboarding Again** (see Layer 8). |
+| `FolderSettingsView.swift` | Change folder, Refresh Agent Files, Git: Initialize Repository / Set Remote / Sync (§18.9), the "Sync automatically" toggle and its status row. |
+| `GuideSettingsView.swift` | In-app explanation of the daily/library contract, plus **Show Onboarding Again** (see Layer 8) and "Using Two Macs" (sync v2 §9.4). |
 | `UpdateController.swift` | All Sparkle code behind `#if canImport(Sparkle)`. Reads `SUFeedURL`; inert without it. Never auto-installs. |
 | `UpdateSettingsView.swift` | The Updates pane — check-now button and the automatic-checks toggle. |
 
@@ -270,6 +276,9 @@ controls over custom chrome.
 | `SettingsTests.swift` | Defaults round-trip, start-behavior. |
 | `ExternalToolsTests.swift` | Editor/Terminal/Git outcome branches. |
 | `AppLifecycleTests.swift` | `KeyCombo` encode/decode. |
+| `GitSyncTests.swift` | Sync v2 engine against real temp repos (bare origin + two clones): run sequence, guards, trailer, union merge, timeouts. |
+| `AutoSyncTests.swift` | Coordinator with scripted git, fake clock/network: coalescing, back-off, notices, toggle, Pre-New-Day; one two-clone integration test. |
+| `SyncStatusTests.swift` | Status-line copy, dot + 2-minute rule, time phrases, earlier-notes condition, system-quit detection. |
 
 `PeteKMUITests/` drives a real capture loop against a scratch folder via
 `PETEKM_UITEST_FOLDER`.

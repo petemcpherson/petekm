@@ -131,6 +131,30 @@ palette (`LibraryPaths.destinations` → `PaletteOutcome.insertText` →
   no upstream, unreachable remote) and `(0, 0)` show nothing; the once-per-process flag
   does not reset when the window is rebuilt or re-summoned.
 
+## Automatic sync (context/sync-v2/spec.md)
+
+- **Writing on one Mac reaches the other with no manual Sync (§5)** — `AutoSync.swift`
+  triggers into the one `GitSupport.run` sequence. `AutoSyncTests/hideOnOneMacArrivesOnTheOther`
+  (two real clones: hide on A pushes, folder-ready on B brings it in with
+  "Updated from <A>."), plus coalescing, back-off, and `offlineCommitsLocallyUntilTheNetworkReturns`.
+  Manual: two-Mac checklist in `context/sync-v2/plan.md`.
+- **Same-day Daily Stickies merge by union; Library conflicts still pause (§7)** —
+  `.gitattributes` `daily/*.md merge=union`, written by `FolderInitializer.ensureDailyUnionMerge`.
+  `GitSyncTests/sameDayStickyOnTwoMacsKeepsEveryLine`, `sameDayStickyCreatedOnBothMacsKeepsEveryLine`,
+  `libraryConflictStillPausesWithTheAttribute`, `sameDayStickyWithoutTheAttributeStillPausesSafely`.
+- **Pre-New-Day never creates today's file blind and never delays capture (§6.5)** —
+  deferred `StickyDocument` in `DailySession`. `DailyStickyTests/deferredDocumentAdoptsTheArrivedFile`,
+  `keystrokeWritesTheComposedTextAtOnce`, `offlineRunWritesAtOnce`, `commitDeferredWritesOrAdopts`,
+  `askPromptClosesWhenTheFileArrives`; `secondMacAdoptsTheFirstMacsNewDay` with real clones.
+- **Sync shows only when something needs the user (§8)** — `SyncStatusDot` (window),
+  `MenuBarController` status row + `PixelMarkBadge`, Settings → Folder → Git status row.
+  `SyncStatusTests` covers every status line, the dot table, and the 2-minute rule.
+- **Quit with unsent notes asks once; system quits don't (§9.2)** —
+  `AppDelegate.terminateAfterSync` after `AutoSync.departBeforeQuit` (5s budget).
+  `SyncStatusTests/systemQuitCarriesAQuitReason` covers logout/restart/shutdown detection;
+  Sparkle's relaunch sets `UpdateController.isRelaunchingForUpdate`. Alert itself: manual
+  (checklist item 5).
+
 ## Vocabulary audit (DESIGN §2, §39)
 
 `SettingsTests/settingsCopyUsesProductVocabulary` asserts no "journal", "entry",

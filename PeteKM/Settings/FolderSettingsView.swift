@@ -186,6 +186,15 @@ private struct GitSettingsSection: View {
                     Text("Keeps this Mac and GitHub in step: brings in changes when you open PeteKM and sends yours when you step away.")
                         .font(DS.Text.caption)
                         .foregroundStyle(DS.Color.textSecondary)
+                    // The same status row as the window dot and menu bar (sync v2 §8.2).
+                    if settings.syncAutomatically, autoSync.folder == folder, let line = autoSync.statusLine {
+                        VStack(alignment: .leading, spacing: DS.Space.s1) {
+                            Text(line)
+                            if let other = autoSync.otherDeviceLine { Text(other) }
+                        }
+                        .font(DS.Text.caption)
+                        .foregroundStyle(autoSync.dotStyle == .orange ? Color.orange : DS.Color.textSecondary)
+                    }
                 }
                 Button("Sync") { sync() }
                     .disabled(isWorking)

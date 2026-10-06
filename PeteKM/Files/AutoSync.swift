@@ -104,7 +104,8 @@ final class AutoSync {
         static let presencePoll: Duration = .seconds(5 * 60)
         static let editIdle: Duration = .seconds(60)
         static let hideDebounce: Duration = .seconds(2)
-        static let pendingSignalAfter: TimeInterval = 2 * 60
+        static let pendingSignalAfter = SyncStatus.pendingSignalAfter
+        static let statusTick: Duration = .seconds(30)
         static let newDayBudget: TimeInterval = 2
         static let wakeNetworkWait: Duration = .seconds(20)
         static let sleepBudget: TimeInterval = 5
@@ -121,15 +122,22 @@ final class AutoSync {
         "Updated from \(device ?? "GitHub")."
     }
 
+    static let earlierNotesNotice = "Notes from earlier on this Mac haven't reached GitHub yet."
+
     // MARK: Published state
 
-    private(set) var status: SyncStatus = .off
+    private(set) var status: SyncStatus = .off {
+        didSet { statusClock = now() }
+    }
+    /// Advanced every `Timing.statusTick` while the status line is time-sensitive,
+    /// so the dot appears at the 2-minute mark without another trigger (§8.1).
+    private(set) var statusClock = Date()
     private(set) var lastFetchAt: Date?
     private(set) var lastRunStderr = ""
     private(set) var otherDeviceLast: (name: String, at: Date)?
     /// One-shot; the view takes it with `consumeNotice()`.
     private(set) var lastNotice: AutoSyncNotice?
-    /// Set on wake for the Phase 5 earlier-notes notice (§9.2).
+    /// Set on wake for the earlier-notes notice (§9.2.3).
     private(set) var wokeAt: Date?
 
     /// Automatic sync is on and watching a folder.
@@ -172,6 +180,8 @@ final class AutoSync {
     @ObservationIgnored private var hideTask: Task<Void, Never>?
     @ObservationIgnored private var idleTask: Task<Void, Never>?
     @ObservationIgnored private var presenceTask: Task<Void, Never>?
+    @ObservationIgnored private var tickTask: Task<Void, Never>?
+    @ObservationIgnored private let launchedAt: Date
 
     init(settings: AppSettings,
          runner: GitRunner = ProcessGitRunner(),
@@ -187,6 +197,7 @@ final class AutoSync {
         self.device = device
         self.editorName = editorName ?? { ExternalEditorProvider.current.displayName }
         self.observesSystem = observesSystem
+        self.launchedAt = now()
         observeSetting()
     }
 
@@ -225,6 +236,23 @@ final class AutoSync {
         teardown()
     }
 
+    // MARK: Visibility (§8.2, §8.4)
+
+    var dotStyle: SyncDotStyle {
+        guard settings.syncAutomatically else { return .hidden }
+        return status.dot(now: statusClock)
+    }
+
+    var statusLine: String? {
+        status.line(now: statusClock)
+    }
+
+    /// "Last from <other Mac>: <time>." for the popover, menu tooltip, and Settings (§9.3).
+    var otherDeviceLine: String? {
+        guard status != .off else { return nil }
+        return SyncTime.otherDeviceLine(otherDeviceLast, now: statusClock)
+    }
+
     func consumeNotice() -> AutoSyncNotice? {
         defer { lastNotice = nil }
         return lastNotice
@@ -241,6 +269,7 @@ final class AutoSync {
         if case .off = status { status = pendingSince.map { .pending(since: $0) } ?? .syncing }
         installObservers()
         startPresencePoll()
+        startStatusTick()
         return fire(.folderReady)
     }
 
@@ -253,6 +282,8 @@ final class AutoSync {
         hideTask?.cancel()
         idleTask?.cancel()
         presenceTask?.cancel()
+        tickTask?.cancel()
+        tickTask = nil
         hideTask = nil
         idleTask = nil
         presenceTask = nil
@@ -365,6 +396,17 @@ final class AutoSync {
         }
     }
 
+    private func startStatusTick() {
+        guard observesSystem, tickTask == nil else { return }
+        tickTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: Timing.statusTick)
+                guard !Task.isCancelled else { return }
+                if status.isTimeSensitive { statusClock = now() }
+            }
+        }
+    }
+
     /// A keystroke in the sticky or a Library file (never Scratch, §5.2).
     func noteEdit() {
         guard isActive else { return }
@@ -382,17 +424,24 @@ final class AutoSync {
         }
     }
 
-    /// The quit departure (§9.2): best effort within the budget, then let go.
-    func departBeforeQuit() async {
-        guard isActive else { return }
+    /// The quit departure (§9.2): best effort within the budget, then report
+    /// whether anything is still only on this Mac. A run that didn't finish in
+    /// time counts as unsent.
+    func departBeforeQuit() async -> Bool {
+        guard isActive, let folder else { return false }
+        let runner = runner
         let once = ResumeOnce()
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+        return await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
             once.continuation = continuation
-            Task { _ = await self.request(.quit); once.resume() }
+            Task {
+                _ = await self.request(.quit)
+                let unsent = await Self.offMain { GitSupport.hasLocalChanges(folder, runner: runner) }
+                once.resume(unsent)
+            }
             Task {
                 // Covers a run already in flight that the quit had to wait behind.
                 try? await Task.sleep(for: .seconds(Timing.quitBudget + 3))
-                once.resume()
+                once.resume(true)
             }
         }
     }
@@ -488,6 +537,17 @@ final class AutoSync {
             }
         }
 
+        // Wake/launch with this Mac's own commits still unsent from before (§9.2.3).
+        // The run's own notice, if any, replaces this one when it finishes.
+        if !manual, let arrivedAt = arrivalTime(for: triggers) {
+            let unpushed = await Self.offMain { GitSupport.unpushedCommits(folder, runner: runner) }
+            if SyncTime.showsEarlierNotesNotice(ahead: unpushed?.count ?? 0,
+                                                oldestUnpushed: unpushed?.oldest,
+                                                arrivedAt: arrivedAt) {
+                lastNotice = AutoSyncNotice(text: Self.earlierNotesNotice, seconds: 8)
+            }
+        }
+
         let previous = status
         if settings.syncAutomatically { status = .syncing }
 
@@ -519,6 +579,13 @@ final class AutoSync {
         apply(run, after: after, previous: previous, manual: manual,
               localOnly: localOnly, attemptedRebase: allowRebase)
         return run
+    }
+
+    /// The wake or launch a run arrives from (§9.2.3); nil for other triggers.
+    private func arrivalTime(for triggers: Set<Trigger>) -> Date? {
+        if triggers.contains(.wake), let wokeAt { return wokeAt }
+        if triggers.contains(.folderReady) { return launchedAt }
+        return nil
     }
 
     private func deadline(for triggers: Set<Trigger>) -> Date? {
@@ -634,10 +701,10 @@ final class AutoSync {
 /// Resumes a continuation at most once, whichever racer gets there first.
 @MainActor
 private final class ResumeOnce {
-    var continuation: CheckedContinuation<Void, Never>?
+    var continuation: CheckedContinuation<Bool, Never>?
 
-    func resume() {
-        continuation?.resume()
+    func resume(_ value: Bool) {
+        continuation?.resume(returning: value)
         continuation = nil
     }
 }

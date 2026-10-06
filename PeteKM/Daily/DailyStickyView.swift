@@ -54,6 +54,9 @@ struct DailyStickyView: View {
             editor(session)
             scratchPane
         }
+        .overlay(alignment: .topTrailing) {
+            SyncStatusDot { gitSync(session: session) }
+        }
         .overlay {
             if let options = session.newDayOptions {
                 ZStack {
@@ -90,6 +93,9 @@ struct DailyStickyView: View {
         .onDisappear {
             removePaletteShortcut()
             noticeTask?.cancel()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .peteKMSyncNow)) { _ in
+            gitSync(session: session)
         }
         .onReceive(NotificationCenter.default.publisher(for: .peteKMOpenSearch)) { _ in
             palette.present(mode: .search)

@@ -38,12 +38,13 @@ final class UpdateController {
     /// Copy shown when updates can't run — plain, no apology (DESIGN §32).
     nonisolated static let unavailableNotice = "This build doesn't check for updates."
 
+    /// Set when Sparkle is about to relaunch into an update, so that quit skips the
+    /// unsent-notes alert (sync v2 §9.2).
+    static var isRelaunchingForUpdate = false
+
 #if canImport(Sparkle)
-    private let updaterController = SPUStandardUpdaterController(
-        startingUpdater: true,
-        updaterDelegate: nil,
-        userDriverDelegate: nil
-    )
+    private let relaunchObserver = RelaunchObserver()
+    private let updaterController: SPUStandardUpdaterController
 
     var isAvailable: Bool { UpdateController.feedURL != nil }
 
@@ -83,5 +84,25 @@ final class UpdateController {
         automaticallyChecksForUpdates = settings.automaticUpdateChecks
     }
 
+#if canImport(Sparkle)
+    private init() {
+        updaterController = SPUStandardUpdaterController(
+            startingUpdater: true,
+            updaterDelegate: relaunchObserver,
+            userDriverDelegate: nil
+        )
+    }
+#else
     private init() {}
+#endif
 }
+
+#if canImport(Sparkle)
+/// Sparkle's will-relaunch callback, the one quit path that never shows the
+/// unsent-notes alert because the app comes straight back.
+nonisolated private final class RelaunchObserver: NSObject, SPUUpdaterDelegate {
+    func updaterWillRelaunchApplication(_ updater: SPUUpdater) {
+        MainActor.assumeIsolated { UpdateController.isRelaunchingForUpdate = true }
+    }
+}
+#endif

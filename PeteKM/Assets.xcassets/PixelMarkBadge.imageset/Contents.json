@@ -1,0 +1,22 @@
+{
+  "images" : [
+    {
+      "filename" : "mark-badge-64.png",
+      "idiom" : "universal",
+      "scale" : "1x"
+    },
+    {
+      "filename" : "mark-badge-128.png",
+      "idiom" : "universal",
+      "scale" : "2x"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  },
+  "properties" : {
+    "preserves-vector-representation" : false,
+    "template-rendering-intent" : "template"
+  }
+}

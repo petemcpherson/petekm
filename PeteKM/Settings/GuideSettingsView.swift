@@ -39,6 +39,7 @@ enum GuideArticle: String, CaseIterable, Identifiable {
     case libraryPaths
     case libraryTidy
     case scratch
+    case twoMacs
     case trust
 
     var id: String { rawValue }
@@ -54,6 +55,7 @@ enum GuideArticle: String, CaseIterable, Identifiable {
         case .libraryPaths: return "Library Paths"
         case .libraryTidy: return "Keeping the Library Tidy"
         case .scratch: return "Scratch"
+        case .twoMacs: return "Using Two Macs"
         case .trust: return "Things Worth Trusting"
         }
     }
@@ -69,6 +71,7 @@ enum GuideArticle: String, CaseIterable, Identifiable {
         case .libraryPaths: return "arrow.right"
         case .libraryTidy: return "books.vertical"
         case .scratch: return "scribble"
+        case .twoMacs: return "laptopcomputer"
         case .trust: return "checkmark.shield"
         }
     }
@@ -85,6 +88,7 @@ enum GuideArticle: String, CaseIterable, Identifiable {
         case .libraryPaths: GuideLibraryPathsArticle()
         case .libraryTidy: GuideLibraryTidyArticle()
         case .scratch: GuideScratchArticle()
+        case .twoMacs: GuideTwoMacsArticle()
         case .trust: GuideTrustArticle()
         }
     }
@@ -207,6 +211,18 @@ private struct GuideScratchArticle: View {
             GuideLine("The agent is told never to read it, quote it, or file it. It's excluded from search, and it's listed in `.gitignore`, so Sync never sends it anywhere.")
             GuideLine("⌘⇧S shows and hides it. Drag its top edge to resize. It empties only when you clear it — the cleared text is kept as a `.bak` file in `.petekm-backups/`.")
             GuideLine("It is plain text on disk, not encrypted. Nothing about it is private from anyone who can read your folder.")
+        }
+    }
+}
+
+/// Sync v2 §9.4, in the same words. A Mac can only report what reached GitHub, so
+/// this says what to do when the other Mac's notes haven't arrived yet.
+private struct GuideTwoMacsArticle: View {
+    var body: some View {
+        GuideSection("Using Two Macs") {
+            GuideLine("**Keep writing.** This is the default and it is safe. Nothing on either Mac will be overwritten. When the other Mac next comes online, it sends its notes. If both Macs wrote in the same day's Daily Sticky, PeteKM keeps both sets of lines and says so.")
+            GuideLine("**If you need those notes right now,** open the other Mac's lid on a network. It sends them within a few seconds of waking. Then summon PeteKM on this Mac, or choose **Sync Now**.")
+            GuideLine("**If you edited the same Library note on both Macs,** sync on whichever Mac comes second pauses and says so. Nothing is lost. Open a terminal in your PeteKM folder and ask PeteKM to help sort it out, or open the folder in \(PaletteCommandID.editorName).")
         }
     }
 }

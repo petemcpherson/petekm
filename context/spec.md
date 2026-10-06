@@ -334,7 +334,8 @@ A default newly initialized PeteKM folder should resemble:
 ├── CLAUDE.md
 ├── AGENTS.md
 ├── .petekm-state.json
-└── .gitignore
+├── .gitignore
+└── .gitattributes
 ```
 
 If Git is enabled, the folder may also contain:
@@ -544,6 +545,7 @@ At minimum:
 - `AGENTS.md`
 - `.petekm-state.json`
 - `.gitignore`
+- `.gitattributes` (`daily/*.md merge=union`, so same-day Daily Stickies from two Macs keep both sets of lines; `context/sync-v2/spec.md` §7)
 
 The default `.gitignore` contains:
 

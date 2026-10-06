@@ -298,6 +298,17 @@ nonisolated enum GitSupport {
         return nil
     }
 
+    /// Commits not yet upstream and the date of the oldest one (§9.2.3), or nil
+    /// without an upstream.
+    static func unpushedCommits(_ folder: PeteKMFolder,
+                                runner: GitRunner = ProcessGitRunner()) -> (count: Int, oldest: Date?)? {
+        let result = runner.run(["log", "--format=%ct", "@{upstream}..HEAD"],
+                                in: folder.root, timeout: Timeouts.local)
+        guard result.succeeded else { return nil }
+        let dates = result.stdout.split(separator: "\n").compactMap { TimeInterval($0.trimmingCharacters(in: .whitespaces)) }
+        return (dates.count, dates.min().map { Date(timeIntervalSince1970: $0) })
+    }
+
     /// The device trailer of the newest commit about to come in, or nil when it
     /// has none (§8.3). Call before the rebase.
     static func incomingDeviceName(_ folder: PeteKMFolder, runner: GitRunner = ProcessGitRunner()) -> String? {

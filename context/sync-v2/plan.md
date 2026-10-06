@@ -9,7 +9,7 @@ and point at `context/sync/spec.md`.
 - [x] **Phase 2** — Daily union merge (`.gitattributes`) + `syncAutomatically` setting
 - [x] **Phase 3** — `AutoSync` coordinator: triggers, coalescing, back-off, `SyncStatus`
 - [x] **Phase 4** — Pre-New-Day: deferred first write of today's Daily Sticky
-- [ ] **Phase 5** — Visibility: dot + popover, menu bar, Settings, notices, quit alert, Guide, docs
+- [x] **Phase 5** — Visibility: dot + popover, menu bar, Settings, notices, quit alert, Guide, docs
 
 Each phase leaves the app shippable. Manual Sync keeps working after every phase; automatic
 behavior only switches on at the end of Phase 3.
@@ -412,80 +412,101 @@ sticky and no union merge needed when both are online.
 
 ### 5.1 Status-line copy (§8.4)
 
-- [ ] `SyncStatus.line(now:calendar:) -> String?` and
+- [x] `SyncStatus.line(now:calendar:) -> String?` and
       `SyncStatus.showsDot(now:) -> DotStyle?` (`none / secondary / orange`) as pure,
       tested functions. 2-minute rule for pending (§8.1).
-- [ ] Time formatting: relative under 1 hour ("2 min ago"), clock time today ("14:02"),
+- [x] Time formatting: relative under 1 hour ("2 min ago"), clock time today ("14:02"),
       date beyond today. One helper, tested.
-- [ ] `otherDeviceLine` → "Last from <name>: <time>." or nil.
-- [ ] `AutoSync` re-evaluates status on a 30s tick while pending, so the dot appears at
+- [x] `otherDeviceLine` → "Last from <name>: <time>." or nil.
+- [x] `AutoSync` re-evaluates status on a 30s tick while pending, so the dot appears at
       the 2-minute mark without another trigger.
 
 ### 5.2 Window dot + popover (§8.2)
 
-- [ ] New `PeteKM/Daily/SyncStatusDot.swift`: 6pt circle, top-trailing overlay in
+- [x] New `PeteKM/Daily/SyncStatusDot.swift`: 6pt circle, top-trailing overlay in
       `DailyStickyView`. Color `DS.Color` secondary or `Color.orange`. `.help(line)`
       tooltip.
-- [ ] Click → `.popover` with status line, other-device line, **Sync Now** button
+- [x] Click → `.popover` with status line, other-device line, **Sync Now** button
       (`request(.manual)`), and **Details…** disclosure showing `lastRunStderr` in a
       selectable monospaced `Text` inside a small `ScrollView`.
-- [ ] Hidden when `showsDot == none` or toggle off.
+- [x] Hidden when `showsDot == none` or toggle off.
 
 ### 5.3 Menu bar (§8.2)
 
-- [ ] `MenuBarController`: `var syncStatusLine: String?`, `var onSyncNow: (() -> Void)?`.
+- [x] `MenuBarController`: `var syncStatusLine: String?`, `var onSyncNow: (() -> Void)?`.
       When non-nil, insert a disabled status row (tooltip = other-device line) and
       **Sync Now** at the top, then a separator.
-- [ ] Badge: new `Assets.xcassets/PixelMarkBadge.imageset` (template; pixel mark plus a
+- [x] Badge: new `Assets.xcassets/PixelMarkBadge.imageset` (template; pixel mark plus a
       corner dot). `glyph(badged:)` swaps the image.
-- [ ] `AppDelegate` observes `autoSync.status` with `withObservationTracking` (same
+- [x] `AppDelegate` observes `autoSync.status` with `withObservationTracking` (same
       pattern as `observeFolder`) and calls `menuBar.refresh()`.
 
 ### 5.4 Settings (§8.2)
 
-- [ ] `GitSettingsSection`: status line + other-device line under the toggle.
+- [x] `GitSettingsSection`: status line + other-device line under the toggle.
 
 ### 5.5 Quit alert (§9.2)
 
-- [ ] In the `.terminateLater` path from Phase 3: after the 5s run, if changes are still
+- [x] In the `.terminateLater` path from Phase 3: after the 5s run, if changes are still
       not on GitHub **and** the quit is user-initiated, show the `NSAlert`
       ("Some notes haven't reached GitHub yet." / body from §9.2 /
       **Quit Anyway** / **Cancel**). Cancel → `reply(false)`.
-- [ ] User-initiated detection: read
+- [x] User-initiated detection: read
       `NSAppleEventManager.shared().currentAppleEvent` at `applicationShouldTerminate`
       time; if it is `kAEQuitApplication` with a `keyAEQuitReason` attribute (logout,
       restart, shutdown) → no alert. Menu-bar / app-menu Quit has no quit-reason → alert.
-- [ ] Sparkle: set an `updaterDelegate` in `UpdateController` (inside
+- [x] Sparkle: set an `updaterDelegate` in `UpdateController` (inside
       `#if canImport(Sparkle)`) implementing `updaterWillRelaunchApplication(_:)` to set
       a `isRelaunchingForUpdate` flag; no alert when set.
 
 ### 5.6 Wake notice (§9.2.3)
 
-- [ ] At the start of a wake/launch arrival run, if `ahead > 0` and the oldest unpushed
+- [x] At the start of a wake/launch arrival run, if `ahead > 0` and the oldest unpushed
       commit's date is before `wokeAt` / process launch → notice
       "Notes from earlier on this Mac haven't reached GitHub yet." (8s). The run's own
       result notice replaces it when it finishes.
 
 ### 5.7 Guide (§9.4)
 
-- [ ] `GuideSettingsView`: "Using two Macs" section, the three points from §9.4 in the
+- [x] `GuideSettingsView`: "Using two Macs" section, the three points from §9.4 in the
       same words.
 
 ### 5.8 Docs
 
-- [ ] `context/map.md`: `AutoSync.swift` row in Layer 2, `.gitattributes` in the generated
+- [x] `context/map.md`: `AutoSync.swift` row in Layer 2, `.gitattributes` in the generated
       folder shape, `PixelMarkBadge` in assets, `syncAutomatically` in the settings list,
       new test files, and a source-of-truth row for `context/sync-v2/`.
-- [ ] `context/spec.md` §5 folder shape: add `.gitattributes`.
-- [ ] `context/ACCEPTANCE.md`: rows for automatic sync, union merge, Pre-New-Day, quit
+- [x] `context/spec.md` §5 folder shape: add `.gitattributes`.
+- [x] `context/ACCEPTANCE.md`: rows for automatic sync, union merge, Pre-New-Day, quit
       alert.
-- [ ] `CLAUDE.md` (this repo): add `.gitattributes` to the generated-files list.
+- [x] `CLAUDE.md` (this repo): add `.gitattributes` to the generated-files list.
 
 ### 5.9 Tests
 
-- [ ] `SyncStatus` line/dot for every row of §8.1 and §8.4, including the 2-minute edge.
-- [ ] Time formatting helper.
-- [ ] Wake-notice condition (pure function over commit dates + wake time).
+- [x] `SyncStatus` line/dot for every row of §8.1 and §8.4, including the 2-minute edge.
+- [x] Time formatting helper.
+- [x] Wake-notice condition (pure function over commit dates + wake time).
+
+Decisions made during implementation:
+
+- `SyncStatus.dot(now:)` returns `SyncDotStyle` (`hidden / secondary / orange`), not an
+  optional, so `.none` never collides with `Optional.none`.
+- The 2-minute rule also applies to `offline` with pending changes; offline with nothing
+  pending shows no dot.
+- `statusClock` ticks every 30s whenever the status is time-sensitive (synced, pending,
+  offline), so "Synced 2 min ago." stays current too, not only the pending dot.
+- Clock times use the user's locale (e.g. "2:02 PM" in the US); tests pin `en_GB` for
+  "14:02". The other-Mac line says "today 09:15" for a clock time, per §9.3.
+- Menu-bar **Sync Now** posts `.peteKMSyncNow`; the sticky view runs the same manual sync
+  as the palette and shows the v1 notice. It doesn't summon the window.
+- Quit: after the run (or the 5s+3s fallback), a cheap `hasLocalChanges` check decides
+  "still not on GitHub"; a run that didn't finish counts as unsent. The quit reason is
+  read as either a parameter or an attribute of the current Apple Event.
+- The earlier-notes notice uses process launch for folder-ready runs and `wokeAt` for wake
+  runs; commits made earlier in the same session never trigger it.
+- `PixelMarkBadge`: the pixel mark with a 4×4-cell pixel dot in the bottom-right corner
+  and a one-cell cut-out (the top-right holds the hair).
+- Guide "Using Two Macs" says "the other Mac" where §9.4 says "Mac A".
 
 **Done when:** the manual checklist below passes on two real Macs.
 

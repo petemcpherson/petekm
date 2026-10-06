@@ -29,9 +29,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuBar.onOpenDailySticky = { [weak self] in self?.windowController?.summon() }
         menuBar.onSettings = { [weak self] in self?.openSettings() }
         menuBar.onRevealFolder = { [weak self] in self?.revealFolder() }
+        menuBar.onSyncNow = { NotificationCenter.default.post(name: .peteKMSyncNow, object: nil) }
 
         observeSettings()
         observeFolder()
+        observeSyncStatus()
         observeSettingsShortcut()
         observeSummonRequests()
         UpdateController.shared.apply(settings: settings)
@@ -50,22 +52,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
               event.type == .keyDown,
               event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
               event.charactersIgnoringModifiers?.lowercased() == "q"
-        else { return terminateAfterSync() }
+        else {
+            // Read now: the Apple Event is only current during this call.
+            let userInitiated = !Self.isSystemQuit(NSAppleEventManager.shared().currentAppleEvent)
+                && !UpdateController.isRelaunchingForUpdate
+            return terminateAfterSync(userInitiated: userInitiated)
+        }
         windowController?.hide()
         return .terminateCancel
     }
 
-    /// Quit departure (sync v2 §9.2): send what's pending within the budget,
-    /// then quit regardless.
-    private func terminateAfterSync() -> NSApplication.TerminateReply {
+    /// Quit departure (sync v2 §9.2): send what's pending within the budget. If
+    /// something is still only on this Mac and the user chose Quit, ask once;
+    /// logout, shutdown, restart, and an update relaunch quit without asking.
+    private func terminateAfterSync(userInitiated: Bool) -> NSApplication.TerminateReply {
         let autoSync = services.autoSync
         guard autoSync.isActive, !isSyncingBeforeQuit else { return .terminateNow }
         isSyncingBeforeQuit = true
         Task {
-            await autoSync.departBeforeQuit()
-            NSApp.reply(toApplicationShouldTerminate: true)
+            let unsent = await autoSync.departBeforeQuit()
+            let quit = !(unsent && userInitiated) || confirmQuitWithUnsentNotes()
+            isSyncingBeforeQuit = false
+            NSApp.reply(toApplicationShouldTerminate: quit)
         }
         return .terminateLater
+    }
+
+    private func confirmQuitWithUnsentNotes() -> Bool {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = "Some notes haven't reached GitHub yet."
+        alert.informativeText = "They're safe on this Mac and will sync the next time PeteKM is open and online."
+        alert.addButton(withTitle: "Quit Anyway")
+        alert.addButton(withTitle: "Cancel")
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    /// A quit sent by the system for logout, restart, or shutdown carries a quit
+    /// reason; one chosen by the user (app menu, menu-bar item, Dock) does not.
+    nonisolated static func isSystemQuit(_ event: NSAppleEventDescriptor?) -> Bool {
+        guard let event,
+              event.eventClass == AEEventClass(kCoreEventClass),
+              event.eventID == AEEventID(kAEQuitApplication)
+        else { return false }
+        let keyword = AEKeyword(kAEQuitReason)
+        return event.paramDescriptor(forKeyword: keyword) != nil
+            || event.attributeDescriptor(forKeyword: keyword) != nil
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
@@ -112,6 +144,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// else should keep it running.
     private func stopAutoSyncWithoutFolder() {
         if services.folderStore.folder == nil { services.autoSync.stop() }
+    }
+
+    /// Keeps the menu-bar status row and badge in step with automatic sync (§8.2).
+    private func observeSyncStatus() {
+        let autoSync = services.autoSync
+        withObservationTracking {
+            _ = autoSync.status
+            _ = autoSync.statusClock
+            _ = autoSync.otherDeviceLast
+            _ = settings.syncAutomatically
+        } onChange: {
+            Task { @MainActor [weak self] in
+                self?.applySyncStatus()
+                self?.observeSyncStatus()
+            }
+        }
+        applySyncStatus()
+    }
+
+    private func applySyncStatus() {
+        let autoSync = services.autoSync
+        menuBar.syncStatusLine = autoSync.statusLine
+        menuBar.syncStatusTooltip = autoSync.otherDeviceLine
+        menuBar.isBadged = autoSync.dotStyle != .hidden
+        menuBar.refresh()
     }
 
     private func applySettings() {

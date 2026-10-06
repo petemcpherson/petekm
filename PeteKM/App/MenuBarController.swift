@@ -9,14 +9,20 @@ final class MenuBarController: NSObject {
     var onRevealFolder: (() -> Void)?    // nil while no PeteKM folder is set
     var onSettings: () -> Void = {}
 
+    /// Sync v2 §8.2: the status row and Sync Now show only while automatic sync is on.
+    var syncStatusLine: String?
+    var syncStatusTooltip: String?
+    var onSyncNow: (() -> Void)?
+    /// The glyph gains a badge dot in the same states as the window dot.
+    var isBadged = false
+
     private var statusItem: NSStatusItem?
 
     func setVisible(_ visible: Bool) {
         if visible {
             guard statusItem == nil else { return }
             let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-            item.button?.image = glyph()
-            item.button?.image?.isTemplate = true
+            item.button?.image = glyph(badged: isBadged)
             item.button?.toolTip = "PeteKM"
             item.menu = buildMenu()
             statusItem = item
@@ -28,17 +34,28 @@ final class MenuBarController: NSObject {
 
     /// Rebuilds the menu so enable/disable state tracks what is actually available.
     func refresh() {
+        statusItem?.button?.image = glyph(badged: isBadged)
         statusItem?.menu = buildMenu()
     }
 
-    private func glyph() -> NSImage? {
-        let image = NSImage(named: "PixelMark")
+    private func glyph(badged: Bool) -> NSImage? {
+        let image = NSImage(named: badged ? "PixelMarkBadge" : "PixelMark")
         image?.size = NSSize(width: 16, height: 16)
+        image?.isTemplate = true
         return image
     }
 
     private func buildMenu() -> NSMenu {
         let menu = NSMenu()
+
+        if let syncStatusLine {
+            let status = NSMenuItem(title: syncStatusLine, action: nil, keyEquivalent: "")
+            status.isEnabled = false
+            status.toolTip = syncStatusTooltip
+            menu.addItem(status)
+            menu.addItem(item("Sync Now", #selector(syncNow), enabled: onSyncNow != nil))
+            menu.addItem(.separator())
+        }
 
         menu.addItem(item("Open Daily Sticky", #selector(openDailySticky), enabled: true))
 
@@ -63,6 +80,7 @@ final class MenuBarController: NSObject {
         return menuItem
     }
 
+    @objc private func syncNow() { onSyncNow?() }
     @objc private func openDailySticky() { onOpenDailySticky() }
     @objc private func search() { onSearch?() }
     @objc private func revealFolder() { onRevealFolder?() }

@@ -14,6 +14,10 @@ extension Notification.Name {
     /// Asks the app delegate to bring the capture window forward. Settings lives in its
     /// own window, so an action taken there has to summon the sticky to be seen.
     static let peteKMSummonWindow = Notification.Name("petekm.summonWindow")
+
+    /// Posted by the menu bar's **Sync Now** — the sticky view runs a manual sync and
+    /// shows its notice, exactly as the palette's Sync does (sync v2 §8.2).
+    static let peteKMSyncNow = Notification.Name("petekm.syncNow")
 }
 
 /// Owns the single sticky capture window: it hides rather than closes, and remembers where it was (§8.6, §8.7).

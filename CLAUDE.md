@@ -43,7 +43,7 @@ These are non-negotiable product rules with direct code consequences. Read the r
 
 ## Key file/folder shapes the app generates
 
-A PeteKM folder the app initializes (`spec.md` §5): `daily/YYYY-MM-DD.md`, `library/**.md`, `.claude/skills/petekm-*/SKILL.md`, `INDEX.md`, `CLAUDE.md`, `AGENTS.md`, `INBOX.md`, `.petekm-state.json`, `.gitignore`. Onboarding must never silently overwrite any of these if they already exist (§19.2).
+A PeteKM folder the app initializes (`spec.md` §5): `daily/YYYY-MM-DD.md`, `library/**.md`, `.claude/skills/petekm-*/SKILL.md`, `INDEX.md`, `CLAUDE.md`, `AGENTS.md`, `INBOX.md`, `.petekm-state.json`, `.gitignore`, `.gitattributes`. Onboarding must never silently overwrite any of these if they already exist (§19.2).
 
 ## Vocabulary (user-facing strings)
 
