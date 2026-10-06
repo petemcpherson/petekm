@@ -517,6 +517,18 @@ Decisions made during implementation:
   and a one-cell cut-out (the top-right holds the hair).
 - Guide "Using Two Macs" says "the other Mac" where §9.4 says "Mac A".
 
+Revised after use (2026-10-06):
+
+- The hidden-when-fine dot was never seen in practice: an edit-idle send at 60s always beat
+  the 2-minute rule. The light is now always on while automatic sync is on: green synced,
+  yellow pending, grey offline or before the first result, red paused or failing. It pulses
+  during a run (at least 1.2s). It moved into the header row.
+- Hovering for 0.3s shows an in-window card (status, "Last checked GitHub for updates",
+  the other-Mac line). Click still opens the popover. The native `.help` tooltip is gone.
+- `SyncStatus.dot` has no `now:` parameter now. The 2-minute rule moved to
+  `needsAttention(now:)`, used only by the menu-bar badge.
+- Paused or failing: each summon shows the status line again as a notice.
+
 **Done when:** the manual checklist below passes on two real Macs.
 
 ---

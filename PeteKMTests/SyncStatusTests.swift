@@ -30,7 +30,7 @@ private func line(_ status: SyncStatus) -> String? {
 
 @Test @MainActor func statusLineCopyForEveryState() {
     #expect(line(.off) == nil)
-    #expect(line(.synced(at: minutesAgo(2))) == "Synced 2 min ago.")
+    #expect(line(.synced(at: minutesAgo(2))) == "Synced 2 min ago. All notes are on GitHub.")
     #expect(line(.syncing) == "Syncing…")
     #expect(line(.pending(since: minutesAgo(28))) == "Not synced yet — changes from 28 min ago are only on this Mac.")
     #expect(line(.pending(since: minutesAgo(88))) == "Not synced yet — changes from 13:02 are only on this Mac.")
@@ -44,24 +44,39 @@ private func line(_ status: SyncStatus) -> String? {
 // MARK: - Dot (§8.1)
 
 @Test @MainActor func dotFollowsTheStateTable() {
-    #expect(SyncStatus.off.dot(now: now) == .hidden)
-    #expect(SyncStatus.synced(at: minutesAgo(30)).dot(now: now) == .hidden)
-    #expect(SyncStatus.syncing.dot(now: now) == .hidden)
-    #expect(SyncStatus.offline(since: minutesAgo(30), pendingSince: nil).dot(now: now) == .hidden)
-    #expect(SyncStatus.paused.dot(now: now) == .orange)
-    #expect(SyncStatus.failing(.push).dot(now: now) == .orange)
-    #expect(SyncStatus.failing(.lock).dot(now: now) == .orange)
+    #expect(SyncStatus.off.dot == .hidden)
+    #expect(SyncStatus.synced(at: minutesAgo(30)).dot == .synced)
+    #expect(SyncStatus.syncing.dot == .neutral)
+    #expect(SyncStatus.pending(since: now).dot == .pending)
+    #expect(SyncStatus.offline(since: minutesAgo(30), pendingSince: nil).dot == .offline)
+    #expect(SyncStatus.offline(since: minutesAgo(30), pendingSince: now).dot == .offline)
+    #expect(SyncStatus.paused.dot == .problem)
+    #expect(SyncStatus.failing(.push).dot == .problem)
+    #expect(SyncStatus.failing(.lock).dot == .problem)
 }
 
-@Test @MainActor func pendingDotWaitsTwoMinutes() {
+@Test @MainActor func badgeWaitsTwoMinutesForPendingButNotForProblems() {
     let since = now
     let pending = SyncStatus.pending(since: since)
-    #expect(pending.dot(now: since.addingTimeInterval(119)) == .hidden)
-    #expect(pending.dot(now: since.addingTimeInterval(120)) == .secondary)
+    #expect(!pending.needsAttention(now: since.addingTimeInterval(119)))
+    #expect(pending.needsAttention(now: since.addingTimeInterval(120)))
 
     let offline = SyncStatus.offline(since: since, pendingSince: since)
-    #expect(offline.dot(now: since.addingTimeInterval(119)) == .hidden)
-    #expect(offline.dot(now: since.addingTimeInterval(120)) == .secondary)
+    #expect(!offline.needsAttention(now: since.addingTimeInterval(119)))
+    #expect(offline.needsAttention(now: since.addingTimeInterval(120)))
+
+    #expect(!SyncStatus.synced(at: since).needsAttention(now: now))
+    #expect(!SyncStatus.offline(since: since, pendingSince: nil).needsAttention(now: now))
+    #expect(SyncStatus.paused.needsAttention(now: now))
+    #expect(SyncStatus.failing(.push).needsAttention(now: now))
+}
+
+@Test @MainActor func fetchLineSaysWhenGitHubWasLastChecked() {
+    #expect(SyncTime.fetchLine(nil, now: now) == nil)
+    #expect(SyncTime.fetchLine(now, now: now, calendar: calendar, locale: locale)
+            == "Last checked GitHub for updates: just now.")
+    #expect(SyncTime.fetchLine(minutesAgo(88), now: now, calendar: calendar, locale: locale)
+            == "Last checked GitHub for updates: today 13:02.")
 }
 
 // MARK: - Time phrases (§8.4, §9.3)

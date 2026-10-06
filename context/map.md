@@ -86,7 +86,7 @@ Targets: `PeteKM` (app), `PeteKMTests` (**Swift Testing** — `@Test`/`#expect`)
 | `AppServices.swift` | `AppServices.shared` — the long-lived stores (`FolderStore`, `AppSettings`, `SyncLaunchCheck`, `AutoSync`). Honors `PETEKM_UITEST_FOLDER` env var to run against a scratch folder. |
 | `StickyWindowController.swift` | One sticky window. `summon()`, float-on-top, hide-not-close (§8.6). Owns the app's `Notification.Name` events, including `.peteKMSummonWindow` (Settings lives in its own window, so an action there must summon the sticky). |
 | `GlobalHotKeyMonitor.swift` + `KeyCombo.swift` | System-wide show/hide shortcut (§8.2). Needs Accessibility permission. |
-| `MenuBarController.swift` | Menu-bar item; visibility rule paired with dock-icon setting (§8.8). While automatic sync is on: a disabled status row + **Sync Now** at the top, and the `PixelMarkBadge` glyph when the window dot would show. |
+| `MenuBarController.swift` | Menu-bar item; visibility rule paired with dock-icon setting (§8.8). While automatic sync is on: a disabled status row + **Sync Now** at the top, and the `PixelMarkBadge` glyph when `AutoSync.needsAttention` (problem now, unsent changes after 2 min). |
 | `ShortcutRecorder.swift` | SwiftUI key-combo recorder used in Settings. |
 | `RootView.swift` | Switches on `FolderStore.State`: `.unset` → onboarding, `.missing` → recovery, `.ready` → `DailyStickyView`. |
 
@@ -102,7 +102,7 @@ Targets: `PeteKM` (app), `PeteKMTests` (**Swift Testing** — `@Test`/`#expect`)
 | `DirectoryWatcher.swift` | FSEvents/DispatchSource watcher; drives external-change detection and index refresh. |
 | `GitSupport.swift` | Shells out to `git`. Two-way Sync: commit → fetch → pull --rebase when behind → push (`context/sync/spec.md` §5.1). Never force-pushes; a conflicting rebase is aborted and reported. `SyncOutcome` enum where every case is survivable, each with a plain `notice(editorName:)` string. `aheadBehind(_:)` parses `rev-list --left-right --count` and returns nil without an upstream. |
 | `AutoSync.swift` | Sync v2 coordinator (`context/sync-v2/`). `@MainActor @Observable`. One entry point, `request(_ trigger:)`: arrival (folder ready, wake, summon, network regained, 5-min presence poll, new day) and departure (hide, 60s edit idle, sleep, quit) triggers, coalesced to one follow-up run, with back-off for offline / push failure / conflict pause. Publishes `SyncStatus`, `statusClock` (30s tick), `otherDeviceLast`, `lastRunStderr`, one-shot `lastNotice`. Off → v1 manual behavior. |
-| `SyncStatusCopy.swift` | Pure copy for `SyncStatus`: `line(now:)` (§8.4), `dot(now:)` with the 2-minute rule (§8.1), `SyncTime.phrase` (relative / clock / date), `otherDeviceLine`, and the earlier-notes condition (§9.2.3). |
+| `SyncStatusCopy.swift` | Pure copy for `SyncStatus`: `line(now:)` (§8.4), `dot` (light color per state, §8.1), `needsAttention(now:)` with the 2-minute rule for the menu-bar badge, `SyncTime.fetchLine`, `SyncTime.phrase` (relative / clock / date), `otherDeviceLine`, and the earlier-notes condition (§9.2.3). |
 | `SyncLaunchCheck.swift` | Only while "Sync automatically" is off. `@Observable`, once per app process: fetch, compare with `aheadBehind`, and show the dismissible "Changes to sync." banner only when `ahead > 0 || behind > 0`. Every failure — no git, not a repository, no upstream, unreachable remote — is silent (`context/sync/spec.md` §4.3). |
 
 ### Generated folder shape
@@ -155,7 +155,7 @@ The capture loop. Read `DailySession` first.
 | `NewDayComposer.swift` | `NewDayStart` = `.scratch / .carryForwardHeaders / .defaultHeaders`; builds the opening text (§7.2–7.6). |
 | `NewDayPrompt.swift` | The tiny "ask each day" prompt (§7.3). |
 | `MarkdownHeadings.swift` | Heading parse used by carry-forward. |
-| `SyncStatusDot.swift` | The window's 6pt sync dot (top-trailing) and its popover: status line, other-Mac line, **Sync Now**, **Details…** (last run's stderr — the only place git output appears). |
+| `SyncStatusDot.swift` | The always-on 8pt sync light at the end of the header (green synced, yellow pending, grey offline, red problem; pulses during a run), a 0.3s hover card, and its popover: status line, last-checked line, other-Mac line, **Sync Now**, **Details…** (last run's stderr — the only place git output appears). |
 | `DailyStickyView.swift` | Main screen. Wires `DailySession` + `EditorController` + `PaletteModel` + `ScratchStore`, paints the window background, hosts the conflict alert, TOC, the transient notice line, and the dismissible "Changes to sync." row from `SyncLaunchCheck` (no counts, no git words). |
 
 ## Layer 3b — Scratch (`PeteKM/Scratch/`)
@@ -278,7 +278,7 @@ controls over custom chrome.
 | `AppLifecycleTests.swift` | `KeyCombo` encode/decode. |
 | `GitSyncTests.swift` | Sync v2 engine against real temp repos (bare origin + two clones): run sequence, guards, trailer, union merge, timeouts. |
 | `AutoSyncTests.swift` | Coordinator with scripted git, fake clock/network: coalescing, back-off, notices, toggle, Pre-New-Day; one two-clone integration test. |
-| `SyncStatusTests.swift` | Status-line copy, dot + 2-minute rule, time phrases, earlier-notes condition, system-quit detection. |
+| `SyncStatusTests.swift` | Status-line copy, light colors, badge 2-minute rule, last-checked line, time phrases, earlier-notes condition, system-quit detection. |
 
 `PeteKMUITests/` drives a real capture loop against a scratch folder via
 `PETEKM_UITEST_FOLDER`.

@@ -49,13 +49,11 @@ struct DailyStickyView: View {
     private func content(_ session: DailySession) -> some View {
         VStack(spacing: 0) {
             header(session)
+                .zIndex(1) // the sync light's hover card hangs over the editor
             Divider()
             syncBanner(session)
             editor(session)
             scratchPane
-        }
-        .overlay(alignment: .topTrailing) {
-            SyncStatusDot { gitSync(session: session) }
         }
         .overlay {
             if let options = session.newDayOptions {
@@ -381,6 +379,7 @@ struct DailyStickyView: View {
                     .help(notice)
                     .transition(.opacity)
             }
+            SyncStatusDot { gitSync(session: session) }
         }
         .padding(.horizontal, DS.Space.s6)
         .padding(.vertical, DS.Space.s4)

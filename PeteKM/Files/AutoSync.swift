@@ -127,8 +127,14 @@ final class AutoSync {
     // MARK: Published state
 
     private(set) var status: SyncStatus = .off {
-        didSet { statusClock = now() }
+        didSet {
+            statusClock = now()
+            if status != .syncing { lastSettled = status }
+        }
     }
+    /// The status before the current run, so the light keeps its color while it
+    /// pulses for a run.
+    private(set) var lastSettled: SyncStatus = .off
     /// Advanced every `Timing.statusTick` while the status line is time-sensitive,
     /// so the dot appears at the 2-minute mark without another trigger (§8.1).
     private(set) var statusClock = Date()
@@ -239,8 +245,23 @@ final class AutoSync {
     // MARK: Visibility (§8.2, §8.4)
 
     var dotStyle: SyncDotStyle {
-        guard settings.syncAutomatically else { return .hidden }
-        return status.dot(now: statusClock)
+        guard settings.syncAutomatically, status != .off else { return .hidden }
+        guard status == .syncing else { return status.dot }
+        let settled = lastSettled.dot
+        return settled == .hidden ? .neutral : settled
+    }
+
+    var isSyncing: Bool { status == .syncing }
+
+    /// Drives the menu-bar badge (§8.2).
+    var needsAttention: Bool {
+        settings.syncAutomatically && status.needsAttention(now: statusClock)
+    }
+
+    /// When this Mac last heard from GitHub, so "up to date" is visible.
+    var fetchLine: String? {
+        guard status != .off else { return nil }
+        return SyncTime.fetchLine(lastFetchAt, now: statusClock)
     }
 
     var statusLine: String? {
@@ -368,7 +389,19 @@ final class AutoSync {
         hideTask?.cancel()
         hideTask = nil
         startPresencePoll()
+        repeatProblemNotice()
         fire(.summon)
+    }
+
+    /// A problem is repeated every time the window comes up until it's fixed, so it
+    /// can't be missed by looking away once.
+    private func repeatProblemNotice() {
+        switch status {
+        case .paused, .failing:
+            if let line = statusLine { lastNotice = AutoSyncNotice(text: line, seconds: 8) }
+        default:
+            break
+        }
     }
 
     private func windowDidHide() {
@@ -414,6 +447,7 @@ final class AutoSync {
             let since = now()
             pendingSince = since
             if case .synced = status { status = .pending(since: since) }
+            if case .synced = lastSettled { lastSettled = .pending(since: since) }
         }
         idleTask?.cancel()
         guard windowVisible else { return }

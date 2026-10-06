@@ -167,7 +167,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let autoSync = services.autoSync
         menuBar.syncStatusLine = autoSync.statusLine
         menuBar.syncStatusTooltip = autoSync.otherDeviceLine
-        menuBar.isBadged = autoSync.dotStyle != .hidden
+        menuBar.isBadged = autoSync.needsAttention
         menuBar.refresh()
     }
 

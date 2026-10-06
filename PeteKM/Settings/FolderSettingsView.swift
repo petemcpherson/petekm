@@ -190,10 +190,11 @@ private struct GitSettingsSection: View {
                     if settings.syncAutomatically, autoSync.folder == folder, let line = autoSync.statusLine {
                         VStack(alignment: .leading, spacing: DS.Space.s1) {
                             Text(line)
+                            if let fetched = autoSync.fetchLine { Text(fetched) }
                             if let other = autoSync.otherDeviceLine { Text(other) }
                         }
                         .font(DS.Text.caption)
-                        .foregroundStyle(autoSync.dotStyle == .orange ? Color.orange : DS.Color.textSecondary)
+                        .foregroundStyle(autoSync.dotStyle == .problem ? DS.Color.error : DS.Color.textSecondary)
                     }
                 }
                 Button("Sync") { sync() }

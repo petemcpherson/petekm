@@ -264,24 +264,27 @@ The `daily/` immutability rule (AI never writes `daily/`) is untouched. Union is
 
 One observable value, owned by the coordinator:
 
-| State | Meaning | Indicator |
+| State | Meaning | Window light |
 | --- | --- | --- |
 | `.off` | Toggle off, or no repo/remote | None |
-| `.synced(at:)` | Last run succeeded; tree clean; even with upstream | None |
-| `.syncing` | A run is in flight | None in the window. Menu row says "Syncing…" |
-| `.pending(since:)` | Local changes not on GitHub yet | Dot only after 2 min (see below) |
-| `.offline(since:)` | Last fetch failed for network reasons | Dot only if also pending |
-| `.paused` | `pullConflict` back-off | Dot, always |
-| `.failing` | `pushFailed` back-off, or a stuck lock | Dot, always |
+| `.synced(at:)` | Last run succeeded; tree clean; even with upstream | Green |
+| `.syncing` | A run is in flight | Keeps the previous color and pulses (grey before the first result) |
+| `.pending(since:)` | Local changes not on GitHub yet | Yellow, from the first keystroke |
+| `.offline(since:)` | Last fetch failed for network reasons | Grey |
+| `.paused` | `pullConflict` back-off | Red |
+| `.failing` | `pushFailed` back-off, or a stuck lock | Red |
 
-**The 2-minute rule.** Pending for less than 2 min is the normal state between typing and the next departure trigger, and is not worth a signal. After 2 min it means something didn't go out, and the user should know before they walk away.
+**Revised 2026-10-06.** The first build hid the light whenever sync was working. In use that meant the user never saw it and had no way to tell that notes reached GitHub or that updates came in. The light is now always on while automatic sync is on, so a working sync is as visible as a broken one.
+
+**The 2-minute rule** now applies only to the menu-bar badge. Pending for less than 2 min is the normal state between typing and the next departure trigger. After 2 min it means something didn't go out, and the user should know before they walk away.
 
 ### 8.2 Where it shows
 
-**Window: one small dot.** A 6pt circle in the window's top-trailing corner, using `DS.Color` secondary (pending/offline) or the system orange (paused/failing). It shows only in the states marked "Dot" above. Nothing is shown when synced; a perpetual green check is chrome that tells the user nothing. Hover shows a tooltip with the status line from §8.4. Click opens a small popover:
+**Window: one small light.** An 8pt circle at the trailing end of the sticky header, colored as in §8.1. A run pulses it for at least 1.2s, so even a fast run is visible. Hovering for 0.3s shows a card with the status line (§8.4), when GitHub was last checked for updates, and the newest change from another Mac. Problems are shown in red text. Click opens a small popover with the same lines plus actions:
 
 ```
 Not synced yet — changes from 14:02 are only on this Mac.
+Last checked GitHub for updates: today 14:01.
 Last from Pete's Personal MacBook: today 09:15.
 
 [Sync Now]        Details…
@@ -291,10 +294,12 @@ Last from Pete's Personal MacBook: today 09:15.
 
 **Menu-bar item.**
 - A disabled status row at the top of the menu, using the §8.4 copy, plus a **Sync Now** item. Hide both when status is `.off`.
-- The glyph gains a small badge dot in the same states as the window dot. The pixel mark is a template image, so add a second template asset `PixelMarkBadge` and swap the image.
+- The glyph gains a small badge dot when the user should act: paused or failing at once, and pending (or offline with pending) after 2 min. The pixel mark is a template image, so add a second template asset `PixelMarkBadge` and swap the image.
 - If the user has hidden the menu-bar item (§8.8), the window dot is the only indicator, which is enough.
 
-**Settings → Folder → Git.** The same status row under the toggle.
+**Settings → Folder → Git.** The same status lines under the toggle.
+
+**Problems repeat.** While paused or failing, each summon of the window shows the status line again in the notice line (8s), until the problem clears.
 
 The v1 "Changes to sync." banner is **not shown** while automatic sync is on. The dot replaces it.
 

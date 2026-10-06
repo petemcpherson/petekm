@@ -1,10 +1,20 @@
 import Foundation
 
 /// How the window dot and menu-bar badge show a `SyncStatus` (sync v2 §8.1, §8.2).
+/// The window's sync light. Always visible while automatic sync is on, so a
+/// working sync is as visible as a broken one.
 enum SyncDotStyle: Equatable, Sendable {
     case hidden
-    case secondary
-    case orange
+    /// No result yet this session (the first run is still going).
+    case neutral
+    /// Everything is on GitHub.
+    case synced
+    /// Changes on this Mac that GitHub doesn't have yet.
+    case pending
+    /// The network is down.
+    case offline
+    /// Paused on a conflict, can't push, or stuck: the user should look.
+    case problem
 }
 
 extension SyncStatus {
@@ -22,7 +32,7 @@ extension SyncStatus {
         case .off:
             return nil
         case .synced(let at):
-            return "Synced \(time(at))."
+            return "Synced \(time(at)). All notes are on GitHub."
         case .syncing:
             return "Syncing…"
         case .pending(let since):
@@ -41,17 +51,27 @@ extension SyncStatus {
     }
 
     /// Which dot, if any, the window and menu bar show (§8.1).
-    func dot(now: Date) -> SyncDotStyle {
-        func signals(_ since: Date) -> SyncDotStyle {
-            now.timeIntervalSince(since) >= Self.pendingSignalAfter ? .secondary : .hidden
+    var dot: SyncDotStyle {
+        switch self {
+        case .off: .hidden
+        case .syncing: .neutral
+        case .synced: .synced
+        case .pending: .pending
+        case .offline: .offline
+        case .paused, .failing: .problem
         }
+    }
+
+    /// The menu-bar badge: problems at once, unsent changes only after 2 min, since
+    /// pending for less is the normal gap between typing and the next send.
+    func needsAttention(now: Date) -> Bool {
         switch self {
         case .off, .synced, .syncing, .offline(_, nil):
-            return .hidden
+            return false
         case .pending(let since), .offline(_, let since?):
-            return signals(since)
+            return now.timeIntervalSince(since) >= Self.pendingSignalAfter
         case .paused, .failing:
-            return .orange
+            return true
         }
     }
 
@@ -97,6 +117,13 @@ enum SyncTime {
 
     /// §9.2.3: at the start of a wake or launch run, commits not yet on GitHub that
     /// are older than the wake/launch survived it unpushed.
+    static func fetchLine(_ at: Date?, now: Date,
+                          calendar: Calendar = .current, locale: Locale = .current) -> String? {
+        guard let at else { return nil }
+        let time = phrase(for: at, now: now, calendar: calendar, locale: locale, todayPrefix: true)
+        return "Last checked GitHub for updates: \(time)."
+    }
+
     static func showsEarlierNotesNotice(ahead: Int, oldestUnpushed: Date?, arrivedAt: Date) -> Bool {
         guard ahead > 0, let oldestUnpushed else { return false }
         return oldestUnpushed < arrivedAt
