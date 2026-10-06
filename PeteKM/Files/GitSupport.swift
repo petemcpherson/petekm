@@ -169,6 +169,18 @@ nonisolated enum GitSupport {
 
     // MARK: - Guards (sync v2 §6.4)
 
+    /// The departure precondition (§5.2): a dirty tree, or commits not yet upstream.
+    static func hasLocalChanges(_ folder: PeteKMFolder, runner: GitRunner) -> Bool {
+        let status = runner.run(["status", "--porcelain"], in: folder.root, timeout: Timeouts.local)
+        if status.succeeded, !status.output.isEmpty { return true }
+        return (aheadBehind(folder, runner: runner)?.ahead ?? 0) > 0
+    }
+
+    static func revision(_ name: String, in folder: PeteKMFolder, runner: GitRunner) -> String? {
+        let result = runner.run(["rev-parse", name], in: folder.root, timeout: Timeouts.local)
+        return result.succeeded && !result.output.isEmpty ? result.output : nil
+    }
+
     enum BusyReason: Equatable, Sendable {
         case indexLock
         case rebase
@@ -304,6 +316,8 @@ nonisolated enum GitSupport {
         var deadline: Date?
         /// False while paused on a conflict (§6.6): fetch still runs, no rebase.
         var allowRebase = true
+        /// Offline back-off (§6.6): commit locally, then stop before the network.
+        var localOnly = false
         var runner: GitRunner = ProcessGitRunner()
         var now: Date = Date()
         var calendar: Calendar = .current
@@ -313,6 +327,7 @@ nonisolated enum GitSupport {
              reconcile: @escaping @MainActor @Sendable () -> Void = {},
              deadline: Date? = nil,
              allowRebase: Bool = true,
+             localOnly: Bool = false,
              runner: GitRunner = ProcessGitRunner(),
              now: Date = Date(),
              calendar: Calendar = .current,
@@ -321,6 +336,7 @@ nonisolated enum GitSupport {
             self.reconcile = reconcile
             self.deadline = deadline
             self.allowRebase = allowRebase
+            self.localOnly = localOnly
             self.runner = runner
             self.now = now
             self.calendar = calendar
@@ -407,6 +423,7 @@ nonisolated enum GitSupport {
         guard let remote = remotes.output.split(separator: "\n").first.map(String.init) else {
             return finish(.noRemote)
         }
+        guard !context.localOnly else { return finish(.offline) }
         guard git.invoke(["fetch"], in: folder.root, timeout: Timeouts.network).succeeded else {
             return finish(.offline)
         }

@@ -59,6 +59,8 @@ struct MarkdownEditor: NSViewRepresentable {
     var continueListMarkers = true
     var controller: EditorController
     var onSelectionChange: (NSRange) -> Void = { _ in }
+    /// Called on every text change the user makes; drives the sync editing-idle timer.
+    var onEdit: (() -> Void)? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -163,6 +165,7 @@ struct MarkdownEditor: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             parent.text = textView.string
+            parent.onEdit?()
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {

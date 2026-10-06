@@ -5,6 +5,9 @@ extension Notification.Name {
     /// Posted when the capture window is summoned — the editor refocuses and rechecks the date (§8.2, §7.7).
     static let peteKMDidSummon = Notification.Name("petekm.didSummon")
 
+    /// Posted from every hide path — close button, keyboard ⌘Q, the hotkey (sync v2 §5.2).
+    static let peteKMDidHide = Notification.Name("petekm.didHide")
+
     /// Posted by the menu bar's **Search All PeteKM…** — opens the palette in search mode (§10.2).
     static let peteKMOpenSearch = Notification.Name("petekm.openSearch")
 
@@ -70,6 +73,7 @@ final class StickyWindowController: NSObject, NSWindowDelegate {
     func hide() {
         window.orderOut(nil)
         NSApp.hide(nil)                       // hand focus back to whatever the user was doing
+        NotificationCenter.default.post(name: .peteKMDidHide, object: nil)
     }
 
     func setFloatsOnTop(_ floats: Bool) {

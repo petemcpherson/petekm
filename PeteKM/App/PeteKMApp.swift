@@ -10,6 +10,7 @@ struct PeteKMApp: App {
             SettingsView()
                 .environment(AppServices.shared.folderStore)
                 .environment(AppServices.shared.settings)
+                .environment(AppServices.shared.autoSync)
         }
         .commands {
             CommandGroup(replacing: .newItem) { }

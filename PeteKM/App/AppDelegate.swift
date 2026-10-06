@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let menuBar = MenuBarController()
     private var windowController: StickyWindowController?
     private var settingsKeyMonitor: Any?
+    private var isSyncingBeforeQuit = false
 
     private var settings: AppSettings { services.settings }
 
@@ -18,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .environment(services.folderStore)
             .environment(services.settings)
             .environment(services.syncLaunchCheck)
+            .environment(services.autoSync)
 
         let controller = StickyWindowController(content: root)
         windowController = controller
@@ -48,9 +50,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
               event.type == .keyDown,
               event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
               event.charactersIgnoringModifiers?.lowercased() == "q"
-        else { return .terminateNow }
+        else { return terminateAfterSync() }
         windowController?.hide()
         return .terminateCancel
+    }
+
+    /// Quit departure (sync v2 §9.2): send what's pending within the budget,
+    /// then quit regardless.
+    private func terminateAfterSync() -> NSApplication.TerminateReply {
+        let autoSync = services.autoSync
+        guard autoSync.isActive, !isSyncingBeforeQuit else { return .terminateNow }
+        isSyncingBeforeQuit = true
+        Task {
+            await autoSync.departBeforeQuit()
+            NSApp.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
@@ -86,10 +101,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } onChange: {
             Task { @MainActor [weak self] in
                 self?.updateMenuBarActions()
+                self?.stopAutoSyncWithoutFolder()
                 self?.observeFolder()
             }
         }
         updateMenuBarActions()
+    }
+
+    /// The sticky view starts automatic sync when a folder is ready; nothing
+    /// else should keep it running.
+    private func stopAutoSyncWithoutFolder() {
+        if services.folderStore.folder == nil { services.autoSync.stop() }
     }
 
     private func applySettings() {

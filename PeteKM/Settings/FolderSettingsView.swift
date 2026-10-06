@@ -154,6 +154,9 @@ private struct AgentFilesSection: View {
 
 private struct GitSettingsSection: View {
 
+    @Environment(AppSettings.self) private var settings
+    @Environment(AutoSync.self) private var autoSync
+
     let folder: PeteKMFolder
 
     @State private var isRepository = false
@@ -176,6 +179,13 @@ private struct GitSettingsSection: View {
                     TextField("GitHub URL", text: $remoteURL)
                     Button("Set Remote") { setRemote() }
                         .disabled(isWorking || remoteURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                if remote != nil {
+                    Toggle("Sync automatically", isOn: Binding(get: { settings.syncAutomatically },
+                                                               set: { settings.syncAutomatically = $0 }))
+                    Text("Keeps this Mac and GitHub in step: brings in changes when you open PeteKM and sends yours when you step away.")
+                        .font(DS.Text.caption)
+                        .foregroundStyle(DS.Color.textSecondary)
                 }
                 Button("Sync") { sync() }
                     .disabled(isWorking)
@@ -237,11 +247,16 @@ private struct GitSettingsSection: View {
         let folder = folder
         let editorName = ExternalEditorProvider.current.displayName
         Task {
-            // No session is reachable from Settings, so no flush or reconcile:
-            // the open sticky's autosave and directory watcher cover both.
-            let run = await Task.detached(priority: .utility) {
-                await GitSupport.run(folder, context: GitSupport.SyncContext())
-            }.value
+            // The sticky view hands AutoSync its folder; fall back to a direct
+            // run if it hasn't yet.
+            let run: GitSupport.SyncRun
+            if autoSync.folder == folder, let served = await autoSync.request(.manual) {
+                run = served
+            } else {
+                run = await Task.detached(priority: .utility) {
+                    await GitSupport.run(folder, context: GitSupport.SyncContext())
+                }.value
+            }
             status = run.outcome.manualNotice(editorName: editorName)
             isWorking = false
             refresh()

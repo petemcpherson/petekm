@@ -7,7 +7,7 @@ and point at `context/sync/spec.md`.
 
 - [x] **Phase 1** — Hardened git engine (process env/timeouts/stderr, guards, v2 run sequence, trailer)
 - [x] **Phase 2** — Daily union merge (`.gitattributes`) + `syncAutomatically` setting
-- [ ] **Phase 3** — `AutoSync` coordinator: triggers, coalescing, back-off, `SyncStatus`
+- [x] **Phase 3** — `AutoSync` coordinator: triggers, coalescing, back-off, `SyncStatus`
 - [ ] **Phase 4** — Pre-New-Day: deferred first write of today's Daily Sticky
 - [ ] **Phase 5** — Visibility: dot + popover, menu bar, Settings, notices, quit alert, Guide, docs
 
@@ -222,27 +222,27 @@ notices, and hiding the v1 banner when on. The dot/menu/popover come in Phase 5.
 
 ### 3.1 New file `PeteKM/Files/AutoSync.swift` (§10.1)
 
-- [ ] `@MainActor @Observable final class AutoSync`.
-- [ ] `enum Trigger { folderReady, wake, summon, networkRegained, presencePoll, hide, editIdle, sleep, quit, newDay, manual }`
+- [x] `@MainActor @Observable final class AutoSync`.
+- [x] `enum Trigger { folderReady, wake, summon, networkRegained, presencePoll, hide, editIdle, sleep, quit, newDay, manual }`
       with `isArrival` / `isDeparture`.
-- [ ] `enum SyncStatus: Equatable { off, synced(at: Date), syncing, pending(since: Date), offline(since: Date, pendingSince: Date?), paused, failing(FailReason) }`
+- [x] `enum SyncStatus: Equatable { off, synced(at: Date), syncing, pending(since: Date), offline(since: Date, pendingSince: Date?), paused, failing(FailReason) }`
       with `FailReason { push, lock }`.
-- [ ] `AutoSync.Timing` — every constant from §10.3 in one place.
-- [ ] Injected dependencies for tests: `GitRunner`, a `Clock`/`now` provider, and a
+- [x] `AutoSync.Timing` — every constant from §10.3 in one place.
+- [x] Injected dependencies for tests: `GitRunner`, a `Clock`/`now` provider, and a
       `NetworkStatus` protocol wrapping `NWPathMonitor`.
-- [ ] Published state: `status`, `lastFetchAt`, `lastRunStderr`, `otherDeviceLast`,
+- [x] Published state: `status`, `lastFetchAt`, `lastRunStderr`, `otherDeviceLast`,
       and `lastNotice: AutoSyncNotice?` (one-shot, consumed by the view).
-- [ ] `weak var session: DailySession?` — set via `register(_ session:)` from
+- [x] `weak var session: DailySession?` — set via `register(_ session:)` from
       `DailyStickyView.onAppear`. Provides flush/reconcile closures for the run.
 
 ### 3.2 `request(_ trigger:)` — the single entry point (§5, §6.6)
 
-- [ ] Off or `.off`-eligible folder (no git / no repo / no remote) → return, except `.manual`.
-- [ ] In flight → set `runAgain = true`, merge the trigger kind, return.
-- [ ] Summon: skip unless `lastFetchAt` is older than `summonStaleness` (5 min).
-- [ ] Departure triggers: first flush, then a cheap local check off-main
+- [x] Off or `.off`-eligible folder (no git / no repo / no remote) → return, except `.manual`.
+- [x] In flight → set `runAgain = true`, merge the trigger kind, return.
+- [x] Summon: skip unless `lastFetchAt` is older than `summonStaleness` (5 min).
+- [x] Departure triggers: first flush, then a cheap local check off-main
       (`status --porcelain` non-empty or `ahead > 0`). No local changes → return.
-- [ ] Back-off (§6.6), all bypassed by `.manual`:
+- [x] Back-off (§6.6), all bypassed by `.manual`:
   - `.offline`: departure triggers still run the local commit only (step 1–2); no network
     until network regained, summon, or wake.
   - `.pushFailed`: at most one attempt per 15 min; clears on a successful push.
@@ -250,78 +250,78 @@ notices, and hiding the v1 banner when on. The dot/menu/popover come in Phase 5.
     Remember `HEAD` and `@{upstream}` SHAs at pause; when either changes, retry once with
     rebase allowed.
   - `.busy`: silent, nothing stored.
-- [ ] After a run, if `runAgain` → start exactly one follow-up run.
-- [ ] Map `SyncRun` → `SyncStatus` and `lastNotice` (§8.3):
+- [x] After a run, if `runAgain` → start exactly one follow-up run.
+- [x] Map `SyncRun` → `SyncStatus` and `lastNotice` (§8.3):
   - `didBringIn` with `incomingDevice` → "Updated from <name>." (4s); no device →
     "Updated from GitHub."
   - `mergedDailyPaths` non-empty → "Merged today's Daily Sticky from both Macs. Check the order." (6s; wins over "Updated from").
   - First `.pullConflict` of a pause → v1 conflict notice (15s), not repeated per retry.
   - Everything else automatic → no notice.
   - `.manual` → v1 `SyncOutcome.notice` as today.
-- [ ] Refresh `otherDeviceLast` after every successful fetch (off-main).
+- [x] Refresh `otherDeviceLast` after every successful fetch (off-main).
 
 ### 3.3 Trigger sources
 
-- [ ] **Folder ready:** `AutoSync.start(folder:)` called from `DailyStickyView.onAppear`
+- [x] **Folder ready:** `AutoSync.start(folder:)` called from `DailyStickyView.onAppear`
       (the view only exists in `.ready`); fires `.folderReady`. `stop()` on disappear /
       folder change.
-- [ ] **Wake / sleep:** `NSWorkspace.shared.notificationCenter` observers for
+- [x] **Wake / sleep:** `NSWorkspace.shared.notificationCenter` observers for
       `didWakeNotification` and `willSleepNotification`, registered in `AutoSync.start`.
   - Wake: wait for `NetworkStatus` satisfied, up to `wakeNetworkWait` (20s), then run.
     Record `wokeAt` for the §9.2 notice (Phase 5).
   - Sleep (§5.3): synchronous flush + local commit on the main actor's watch (fast), then
     the network sequence with a 5s `deadline`. The run's timeouts kill git when exceeded;
     the marker from 1.2 handles a killed rebase next time.
-- [ ] **Summon:** observe `.peteKMDidSummon`.
-- [ ] **Network regained:** `NWPathMonitor` on a private queue; hop to main on
+- [x] **Summon:** observe `.peteKMDidSummon`.
+- [x] **Network regained:** `NWPathMonitor` on a private queue; hop to main on
       unsatisfied → satisfied transitions only.
-- [ ] **Presence poll:** `Task` loop every 5 min, started when the window becomes visible,
+- [x] **Presence poll:** `Task` loop every 5 min, started when the window becomes visible,
       cancelled on hide.
-- [ ] **Hide:** new `Notification.Name.peteKMDidHide`, posted from
+- [x] **Hide:** new `Notification.Name.peteKMDidHide`, posted from
       `StickyWindowController.hide()` (covers `windowShouldClose` and keyboard ⌘Q, which
       both call `hide()`). 2s debounce in `AutoSync`; a summon inside the window cancels it.
-- [ ] Expose visibility: `StickyWindowController` posts `.peteKMDidSummon` / `.peteKMDidHide`;
+- [x] Expose visibility: `StickyWindowController` posts `.peteKMDidSummon` / `.peteKMDidHide`;
       `AutoSync` tracks `windowVisible` from those two.
-- [ ] **Editing idle:** `AutoSync.noteEdit()` restarts a 60s timer while the window is
+- [x] **Editing idle:** `AutoSync.noteEdit()` restarts a 60s timer while the window is
       visible. Add `var onEdit: (() -> Void)? = nil` to `MarkdownEditor`; call it from
       `Coordinator.textDidChange`. `DailyStickyView` passes `autoSync.noteEdit`;
       `ScratchPaneView` passes nothing (Scratch never triggers sync, §5.2).
-- [ ] **Quit:** `AppDelegate.applicationShouldTerminate` — keep the keyboard-⌘Q-hides
+- [x] **Quit:** `AppDelegate.applicationShouldTerminate` — keep the keyboard-⌘Q-hides
       branch first. Otherwise, if automatic sync is on and local changes exist, return
       `.terminateLater`, run `.quit` with a 5s deadline, then
       `NSApp.reply(toApplicationShouldTerminate: true)`. (The alert is Phase 5; here it
       always quits after the run.)
-- [ ] **Manual:** palette Sync and Settings Sync call `autoSync.request(.manual)`; the
+- [x] **Manual:** palette Sync and Settings Sync call `autoSync.request(.manual)`; the
       view shows the returned notice. Works when the toggle is off too.
 
 ### 3.4 Wiring
 
-- [ ] `AppServices`: `let autoSync = AutoSync(settings:)`.
-- [ ] `AppDelegate`: inject `.environment(services.autoSync)` into `RootView`; pass
+- [x] `AppServices`: `let autoSync = AutoSync(settings:)`.
+- [x] `AppDelegate`: inject `.environment(services.autoSync)` into `RootView`; pass
       `autoSync` to the terminate path.
-- [ ] Observe `settings.syncAutomatically`: off → tear down observers/timers,
+- [x] Observe `settings.syncAutomatically`: off → tear down observers/timers,
       `status = .off`. On → start again.
-- [ ] `DailyStickyView`:
+- [x] `DailyStickyView`:
   - `syncLaunchCheck.runIfNeeded` and the "Changes to sync." banner only when the toggle
     is off (§4, §8.2). `SyncLaunchCheck` itself unchanged.
   - Consume `autoSync.lastNotice` into the existing `show(_:seconds:)` notice line.
-- [ ] `FolderSettingsView` `GitSettingsSection`: "Sync automatically" toggle + caption from
+- [x] `FolderSettingsView` `GitSettingsSection`: "Sync automatically" toggle + caption from
       §4, visible only when the folder is a repo with a remote.
 
 ### 3.5 Tests — new `PeteKMTests/AutoSyncTests.swift`
 
 Fake `GitRunner`, fake clock, fake `NetworkStatus`.
 
-- [ ] Three triggers during one in-flight run → exactly one follow-up run.
-- [ ] Departure trigger with a clean tree and ahead == 0 → no run.
-- [ ] Summon with `lastFetchAt` 2 min ago → no run; 6 min ago → run.
-- [ ] `.offline` → departure commits only, no fetch; network regained → full run.
-- [ ] `.pushFailed` → second attempt suppressed for 15 min, allowed after; manual ignores it.
-- [ ] `.pullConflict` → no rebase on later runs; changing the fake `@{upstream}` SHA →
+- [x] Three triggers during one in-flight run → exactly one follow-up run.
+- [x] Departure trigger with a clean tree and ahead == 0 → no run.
+- [x] Summon with `lastFetchAt` 2 min ago → no run; 6 min ago → run.
+- [x] `.offline` → departure commits only, no fetch; network regained → full run.
+- [x] `.pushFailed` → second attempt suppressed for 15 min, allowed after; manual ignores it.
+- [x] `.pullConflict` → no rebase on later runs; changing the fake `@{upstream}` SHA →
       one retry with rebase. Conflict notice emitted once.
-- [ ] Toggle off → `status == .off`, no runs from triggers; manual still runs.
-- [ ] Notice mapping: incoming with trailer / without trailer / merged daily.
-- [ ] Integration test with the real `GitFixture`: hide trigger on clone A with a dirty
+- [x] Toggle off → `status == .off`, no runs from triggers; manual still runs.
+- [x] Notice mapping: incoming with trailer / without trailer / merged daily.
+- [x] Integration test with the real `GitFixture`: hide trigger on clone A with a dirty
       tree pushes; folder-ready on clone B brings it in and emits "Updated from <A's name>."
 
 **Done when:** with the toggle on, writing on clone A and hiding the window delivers the

@@ -6,6 +6,7 @@ struct DailyStickyView: View {
     @Environment(FolderStore.self) private var folderStore
     @Environment(AppSettings.self) private var settings
     @Environment(SyncLaunchCheck.self) private var syncLaunchCheck
+    @Environment(AutoSync.self) private var autoSync
 
     let folder: PeteKMFolder
 
@@ -67,7 +68,15 @@ struct DailyStickyView: View {
             installPaletteShortcut()
             noticeIfAgentFilesOutOfDate()
             prepareScratch()
-            syncLaunchCheck.runIfNeeded(folder: folder)
+            autoSync.register(session)
+            autoSync.start(folder: folder)
+            if !settings.syncAutomatically {
+                syncLaunchCheck.runIfNeeded(folder: folder)
+            }
+            showAutoSyncNotice()
+        }
+        .onChange(of: autoSync.lastNotice) { _, _ in
+            showAutoSyncNotice()
         }
         .onChange(of: session.document?.url) { _, _ in
             palette.isDocumentOpen = session.document != nil
@@ -107,7 +116,8 @@ struct DailyStickyView: View {
     /// One non-modal, dismissible row. No counts, no ahead/behind, no Git words.
     @ViewBuilder
     private func syncBanner(_ session: DailySession) -> some View {
-        if syncLaunchCheck.showsBanner {
+        // Automatic sync replaces the v1 banner (sync v2 §4, §8.2).
+        if !settings.syncAutomatically && syncLaunchCheck.showsBanner {
             HStack(spacing: DS.Space.s4) {
                 Text("Changes to sync.")
                     .font(DS.Text.caption)
@@ -274,27 +284,18 @@ struct DailyStickyView: View {
     /// text — capture never waits on it (§17.4). Flush and reconcile are the
     /// only steps that come back to the main actor (sync v2 §6.1).
     private func gitSync(session: DailySession) {
-        let folder = folder
-        let context = GitSupport.SyncContext(
-            flush: { [weak session] in session?.flush() },
-            // A run that brought changes in may have rewritten the open file;
-            // notice it now rather than at the next activation (sync v2 §6.2).
-            reconcile: { [weak session] in session?.document?.reconcileWithDisk() }
-        )
         Task {
-            let run = await Task.detached(priority: .utility) {
-                await GitSupport.run(folder, context: context)
-            }.value
-            // A conflict asks something of the user; give it the longer notice.
+            guard let run = await autoSync.request(.manual) else { return }
             show(run.outcome.manualNotice(editorName: ExternalEditorProvider.current.displayName),
                  seconds: run.outcome == .pullConflict ? 15 : 6)
         }
     }
 
-    /// Once per shipped template version: if the folder's agent files differ from
-    /// what this build ships, say so and point at the fix (§6.5). Never blocks,
-    /// never repeats for the same version — a user who edited AGENTS.md on purpose
-    /// sees this once and not again until the app ships new content.
+    private func showAutoSyncNotice() {
+        guard let notice = autoSync.consumeNotice() else { return }
+        show(notice.text, seconds: notice.seconds)
+    }
+
     private func noticeIfAgentFilesOutOfDate() {
         let fingerprint = FolderInitializer.agentTemplatesFingerprint
         guard settings.agentFilesNoticeShownFor != fingerprint else { return }
@@ -386,7 +387,8 @@ struct DailyStickyView: View {
                 StickyTextEditor(document: document,
                                  settings: settings,
                                  controller: editorController,
-                                 preferredSelection: session.revealRange)
+                                 preferredSelection: session.revealRange,
+                                 onEdit: autoSync.noteEdit)
                     .id(document.url)
             }
         } else {
@@ -399,16 +401,19 @@ private struct StickyTextEditor: View {
     @Bindable var document: StickyDocument
     let settings: AppSettings
     let controller: EditorController
+    let onEdit: () -> Void
 
     private let cursors = CursorMemory()
 
     init(document: StickyDocument,
          settings: AppSettings,
          controller: EditorController,
-         preferredSelection: NSRange? = nil) {
+         preferredSelection: NSRange? = nil,
+         onEdit: @escaping () -> Void) {
         _document = Bindable(document)
         self.settings = settings
         self.controller = controller
+        self.onEdit = onEdit
         // A search hit wins over the remembered caret; otherwise restore where the
         // user left off before the text view is built (§8.3, §11.4).
         controller.initialSelection = preferredSelection ?? CursorMemory().selection(for: document.url)
@@ -421,7 +426,8 @@ private struct StickyTextEditor: View {
             autoClosePairs: settings.autoClosePairs,
             continueListMarkers: settings.continueListMarkers,
             controller: controller,
-            onSelectionChange: { cursors.remember($0, for: document.url) }
+            onSelectionChange: { cursors.remember($0, for: document.url) },
+            onEdit: onEdit
         )
     }
 }
