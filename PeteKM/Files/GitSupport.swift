@@ -585,13 +585,39 @@ nonisolated enum GitSupport {
 
     /// Every invocation's environment: fail instead of prompting for a
     /// password, passphrase, or host key, but keep HOME and PATH so credential
-    /// helpers and the SSH agent still work (§6.7).
+    /// helpers and the SSH agent still work (§6.7). PATH also gains the
+    /// package-manager directories so helpers installed there are found.
     static let environment: [String: String] = {
         var environment = ProcessInfo.processInfo.environment
+        environment["PATH"] = searchPath(inherited: environment["PATH"])
         environment["GIT_TERMINAL_PROMPT"] = "0"
         environment["GIT_SSH_COMMAND"] = "ssh -o BatchMode=yes -o ConnectTimeout=10"
         return environment
     }()
+
+    /// Where package managers install git and its credential helpers (gh,
+    /// git-credential-manager, git-lfs), in the order a typical shell PATH
+    /// lists them. A GUI app inherits launchd's minimal PATH, which has none.
+    static let toolDirectories = ["/opt/homebrew/bin", "/usr/local/bin", "/opt/local/bin"]
+
+    /// The inherited PATH with the tool directories in front, without duplicates.
+    static func searchPath(inherited: String?) -> String {
+        var seen = Set<String>()
+        let inheritedParts = (inherited ?? "/usr/bin:/bin:/usr/sbin:/sbin").split(separator: ":").map(String.init)
+        return (toolDirectories + inheritedParts).filter { seen.insert($0).inserted }.joined(separator: ":")
+    }
+
+    /// The git the user's terminal most likely runs. Its credential helper is
+    /// then the same binary the keychain item already trusts, so the app does
+    /// not set off a keychain access prompt. Nil means fall back to `env git`.
+    static func executable(isExecutable: (String) -> Bool = FileManager.default.isExecutableFile(atPath:)) -> URL? {
+        (toolDirectories + ["/usr/bin"])
+            .map { $0 + "/git" }
+            .first(where: isExecutable)
+            .map { URL(filePath: $0) }
+    }
+
+    private static let resolvedExecutable = executable()
 
     /// Run a git subcommand, returning trimmed stdout, or nil if git is missing,
     /// exited non-zero, or timed out.
@@ -606,8 +632,13 @@ nonisolated enum GitSupport {
     /// Blocking — call it off the main actor.
     static func runDetailed(_ arguments: [String], in directory: URL, timeout: Duration) -> GitResult {
         let process = Process()
-        process.executableURL = URL(filePath: "/usr/bin/env")
-        process.arguments = ["git"] + arguments
+        if let git = resolvedExecutable {
+            process.executableURL = git
+            process.arguments = arguments
+        } else {
+            process.executableURL = URL(filePath: "/usr/bin/env")
+            process.arguments = ["git"] + arguments
+        }
         process.currentDirectoryURL = directory
         process.environment = environment
         process.standardInput = FileHandle.nullDevice

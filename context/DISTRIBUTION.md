@@ -47,9 +47,9 @@ Do these in order. Steps marked **✅ Done** were completed by Claude on 2026-10
 1. ✅ **`LICENSE`** added at the repo root: MIT, "Copyright (c) 2026 Pete McPherson". Anyone may use, modify and redistribute.
 2. ✅ **Hardcoded home path removed** from `context/design-system/gen-appicon-layer.py:2`. `ROOT` is now derived from the script's own location.
 3. ✅ **`README.md`** added. It covers what PeteKM is, features, the brew install commands, building from source and the license. Optional: add a screenshot (for example `docs/screenshot.png`, referenced from the README).
-4. **You: skim `context/`** (spec, design, plans) for anything you would not want public. Claude's scans of the full history (2026-10-06) found no credentials, keys, phone numbers or street addresses. A human read is still the only check for personal anecdotes.
+4. ✅ **You: skim `context/`** (spec, design, plans) for anything you would not want public. Claude's scans of the full history (2026-10-06) found no credentials, keys, phone numbers or street addresses. A human read is still the only check for personal anecdotes.
 
-Then commit and push:
+✅ Then commit and push:
 
 ```bash
 git add LICENSE README.md Casks/petekm.rb context/

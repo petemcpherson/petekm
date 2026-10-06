@@ -314,6 +314,19 @@ private func strandRebase(_ fixture: GitFixture, _ folder: PeteKMFolder) throws 
 
 // MARK: - Hardening (§6.7)
 
+@Test func gitPrefersPackageManagerInstall() {
+    #expect(GitSupport.executable { ["/opt/homebrew/bin/git", "/usr/bin/git"].contains($0) }?.path() == "/opt/homebrew/bin/git")
+    #expect(GitSupport.executable { ["/usr/local/bin/git", "/usr/bin/git"].contains($0) }?.path() == "/usr/local/bin/git")
+    #expect(GitSupport.executable { $0 == "/usr/bin/git" }?.path() == "/usr/bin/git")
+    #expect(GitSupport.executable { _ in false } == nil)
+}
+
+@Test func searchPathPutsToolDirectoriesFirstWithoutDuplicates() {
+    #expect(GitSupport.searchPath(inherited: "/usr/bin:/bin:/usr/local/bin")
+            == "/opt/homebrew/bin:/usr/local/bin:/opt/local/bin:/usr/bin:/bin")
+    #expect(GitSupport.searchPath(inherited: nil).hasSuffix(":/usr/bin:/bin:/usr/sbin:/sbin"))
+}
+
 @Test func gitNeverPrompts() {
     #expect(GitSupport.environment["GIT_TERMINAL_PROMPT"] == "0")
     #expect(GitSupport.environment["GIT_SSH_COMMAND"]?.contains("BatchMode=yes") == true)
