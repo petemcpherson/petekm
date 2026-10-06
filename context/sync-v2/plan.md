@@ -210,6 +210,15 @@ as v1 from the user's point of view.
   - Without the attribute on one clone's checkout → still `.pullConflict` safely
     (self-healing rollout, §7.5).
 
+Decision made after implementation:
+
+- `FolderInitializer.ensureLocalDailyUnionMerge` writes the union line to
+  `.git/info/attributes`; `GitSupport` calls it right before the step-6b rebase. A rebase
+  reads attributes from the remote's checked-out files, so the first v2 sync on a Mac
+  conflicted on dailies before `.gitattributes` was on the remote (found on a real folder,
+  2026-10-06). The old "without the attribute still pauses" test became
+  `firstSyncMergesSameDayStickyBeforeTheAttributeIsOnTheRemote`.
+
 **Done when:** a two-clone same-day edit syncs cleanly; Library conflicts still pause.
 
 ---

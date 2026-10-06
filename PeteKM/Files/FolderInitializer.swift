@@ -155,6 +155,32 @@ enum FolderInitializer {
         return true
     }
 
+    /// Puts the daily union line in `.git/info/attributes` too.
+    ///
+    /// A rebase reads attributes from the files checked out while it runs, which are
+    /// the remote's. Until `.gitattributes` has reached the remote, the first v2 sync
+    /// on each Mac would conflict on same-day stickies instead of merging them. The
+    /// repository-local file applies whatever is checked out and is never committed.
+    /// Does nothing when there is no `.git` directory. Returns true if it wrote.
+    @discardableResult
+    static func ensureLocalDailyUnionMerge(_ folder: PeteKMFolder) -> Bool {
+        guard FileWriting.isDirectory(folder.gitDirectory) else { return false }
+        let info = folder.gitDirectory.appending(path: "info", directoryHint: .isDirectory)
+        let url = info.appending(path: "attributes")
+
+        let existing = FileWriting.readText(url) ?? ""
+        let present = Set(existing.split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) })
+        guard !present.contains(AgentTemplates.dailyUnionLine) else { return false }
+
+        var text = existing
+        if !text.isEmpty && !text.hasSuffix("\n") { text += "\n" }
+        text += AgentTemplates.dailyUnionLine + "\n"
+        try? FileManager.default.createDirectory(at: info, withIntermediateDirectories: true)
+        try? FileWriting.writeAtomically(text, to: url)
+        return true
+    }
+
     static func agentFilesAreOutOfDate(_ folder: PeteKMFolder) -> Bool {
         var items: [(URL, String)] = [(folder.claudeMd, AgentTemplates.claudeMd),
                                       (folder.agentsMd, AgentTemplates.agentsMd)]

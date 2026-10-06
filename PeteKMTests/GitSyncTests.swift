@@ -579,9 +579,10 @@ private func lines(_ data: Data) -> Set<Substring> {
     #expect(!fixture.exists("rebase-merge", in: fixture.b))
 }
 
-/// Self-healing rollout (§7.5): a clone that has not received the attribute yet
-/// still pauses safely on a same-day edit — nothing lost, nothing half-done.
-@Test func sameDayStickyWithoutTheAttributeStillPausesSafely() async throws {
+/// Rollout (§7.5): the first v2 sync on a Mac commits `.gitattributes` while the
+/// remote has none. The rebase checks out the remote's files, so only the
+/// repository-local `.git/info/attributes` can make the daily merge by union.
+@Test func firstSyncMergesSameDayStickyBeforeTheAttributeIsOnTheRemote() async throws {
     guard let fixture = try GitFixture() else { return }
     let path = "daily/2026-10-05.md"
     try fixture.write("- start\n", path, in: fixture.a)
@@ -590,12 +591,30 @@ private func lines(_ data: Data) -> Set<Substring> {
 
     try fixture.write("- start\n- from A\n", path, in: fixture.a)
     #expect(await fixture.run(fixture.a).outcome == .synced)
+    let localAttributes = fixture.b.gitDirectory.appending(path: "info/attributes")
+    try? FileManager.default.removeItem(at: localAttributes)  // B's first v2 sync
+    FolderInitializer.ensureDailyUnionMerge(fixture.b)
     try fixture.write("- start\n- from B\n", path, in: fixture.b)
-    let before = try fixture.read(path, in: fixture.b)
 
     let run = await fixture.run(fixture.b)
-    #expect(run.outcome == .pullConflict)
-    #expect(try fixture.read(path, in: fixture.b) == before)
+    #expect(run.outcome == .synced)
+    #expect(run.mergedDailyPaths == [path])
+    #expect(lines(try fixture.read(path, in: fixture.b)).isSuperset(of: ["- start", "- from A", "- from B"]))
     #expect(!fixture.exists("rebase-merge", in: fixture.b))
     #expect(!fixture.exists(GitSupport.rebaseMarkerName, in: fixture.b))
+}
+
+@Test func ensureLocalDailyUnionMergeWritesOnceAndSkipsNonRepositories() throws {
+    guard let fixture = try GitFixture() else { return }
+    let url = fixture.a.gitDirectory.appending(path: "info/attributes")
+    try? FileManager.default.removeItem(at: url)
+
+    #expect(FolderInitializer.ensureLocalDailyUnionMerge(fixture.a))
+    #expect(FileWriting.readText(url)?.contains(AgentTemplates.dailyUnionLine) == true)
+    #expect(!FolderInitializer.ensureLocalDailyUnionMerge(fixture.a))
+
+    let plain = PeteKMFolder(root: FileManager.default.temporaryDirectory
+        .appending(path: "petekm-no-git-\(UUID().uuidString)", directoryHint: .isDirectory))
+    #expect(!FolderInitializer.ensureLocalDailyUnionMerge(plain))
+    #expect(!FileWriting.isDirectory(plain.gitDirectory))
 }

@@ -255,6 +255,7 @@ The `daily/` immutability rule (AI never writes `daily/`) is untouched. Union is
 - Add `PeteKMFolder.gitattributes` and an `AgentTemplates.gitattributes` template containing the line above plus a one-line comment.
 - Add `FolderInitializer.ensureDailyUnionMerge(_:)`, modeled exactly on `ensureScratchIgnored`. It appends the line if missing, never replaces user content, and runs on window open. Existing folders are repaired without a prompt.
 - The file is **tracked** (not gitignored), so the next sync carries it to the other Mac. Until the other Mac also has it, a conflict there still pauses safely. Rollout is self-healing.
+- A rebase reads attributes from the files it checks out, which are the remote's. So before every rebase the engine also writes the line to the repository-local `.git/info/attributes` (never committed, applies whatever is checked out). Without it, the first v2 sync on a Mac conflicts on same-day stickies until `.gitattributes` has reached the remote. A Mac still on v1 has neither, and still pauses safely.
 - Update the generated folder shape lists in `context/map.md` and spec §5, and mention `.gitattributes` in `CLAUDE.md`/`AGENTS.md` templates as "not yours to edit."
 
 ## 8. Status and visibility

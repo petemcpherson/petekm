@@ -488,6 +488,7 @@ nonisolated enum GitSupport {
             }
             let merged = dailyPathsChangedOnBothSides(folder, runner: git)
             let incoming = incomingDeviceName(folder, runner: git)
+            FolderInitializer.ensureLocalDailyUnionMerge(folder)
 
             let marker = rebaseMarker(folder)
             FileManager.default.createFile(atPath: marker.path(percentEncoded: false), contents: nil)
