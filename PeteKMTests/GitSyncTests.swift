@@ -617,6 +617,90 @@ private func lines(_ data: Data) -> Set<Substring> {
     #expect(!fixture.exists(GitSupport.rebaseMarkerName, in: fixture.b))
 }
 
+/// Real git, plus one side effect just before the first `rebase`: the shape of
+/// the New Day write or an autosave landing after step 6a's commit.
+final class WriteBeforeRebaseRunner: GitRunner, @unchecked Sendable {
+    private let lock = NSLock()
+    private var fired = false
+    let base = ProcessGitRunner()
+    let action: () -> Void
+
+    init(_ action: @escaping () -> Void) {
+        self.action = action
+    }
+
+    func run(_ arguments: [String], in directory: URL, timeout: Duration) -> GitResult {
+        if arguments.first == "rebase", arguments.count > 1, arguments[1] != "--abort" {
+            lock.lock()
+            let first = !fired
+            fired = true
+            lock.unlock()
+            if first { action() }
+        }
+        return base.run(arguments, in: directory, timeout: timeout)
+    }
+}
+
+/// 2026-10-07: the Pre-New-Day timer wrote a blank sticky mid-run. Untracked, so
+/// --autostash skipped it and the checkout refused. The blank copy gives way to
+/// the other Mac's, and the run completes.
+@Test func blankStickyWrittenDuringTheRunGivesWayToUpstream() async throws {
+    guard let fixture = try GitFixture() else { return }
+    await fixture.shareDailyUnionMerge()
+    let path = "daily/2026-10-07.md"
+    try fixture.write("# work\n\n- from A\n", path, in: fixture.a)
+    #expect(await fixture.run(fixture.a).outcome == .synced)
+
+    let b = fixture.b
+    let runner = WriteBeforeRebaseRunner { try? GitFixture.write("# October 7, 2026\n\n", path, in: b) }
+    let run = await GitSupport.run(b, context: GitSupport.SyncContext(runner: runner, device: "Test Mac"))
+
+    #expect(run.outcome == .synced)
+    #expect(run.didBringIn)
+    #expect(try fixture.read(path, in: b) == fixture.read(path, in: fixture.a))
+    #expect(fixture.git(["status", "--porcelain"], in: b) == "")
+    #expect(!fixture.exists(GitSupport.rebaseMarkerName, in: b))
+}
+
+/// The same race, but the user already typed: the local copy is committed and
+/// merges by union, so nothing typed on either Mac is lost.
+@Test func typedStickyWrittenDuringTheRunMergesByUnion() async throws {
+    guard let fixture = try GitFixture() else { return }
+    await fixture.shareDailyUnionMerge()
+    let path = "daily/2026-10-07.md"
+    try fixture.write("# work\n\n- from A\n", path, in: fixture.a)
+    #expect(await fixture.run(fixture.a).outcome == .synced)
+
+    let b = fixture.b
+    let runner = WriteBeforeRebaseRunner { try? GitFixture.write("# October 7, 2026\n\n- from B\n", path, in: b) }
+    let run = await GitSupport.run(b, context: GitSupport.SyncContext(runner: runner, device: "Test Mac"))
+
+    #expect(run.outcome == .synced)
+    #expect(run.mergedDailyPaths == [path])
+    #expect(lines(try fixture.read(path, in: b)).isSuperset(of: ["# work", "- from A", "- from B"]))
+    #expect(fixture.git(["status", "--porcelain"], in: b) == "")
+    #expect(!fixture.exists(GitSupport.rebaseMarkerName, in: b))
+}
+
+/// A rebase that fails before it starts leaves nothing to abort, and must not
+/// leave PeteKM's marker behind either.
+@Test func rebaseThatNeverStartedLeavesNoMarker() async throws {
+    guard let fixture = try GitFixture() else { return }
+    try fixture.write("# From A\n", "library/a.md", in: fixture.a)
+    #expect(await fixture.run(fixture.a).outcome == .synced)
+
+    let real = ProcessGitRunner()
+    let runner = FakeGitRunner { arguments in
+        arguments.first == "rebase" && arguments.count > 1 && arguments[1] == "--autostash"
+            ? GitResult(status: 1, stdout: "", stderr: "error: could not detach HEAD", timedOut: false)
+            : real.run(arguments, in: fixture.b.root, timeout: .seconds(15))
+    }
+    let run = await GitSupport.run(fixture.b, context: GitSupport.SyncContext(runner: runner, device: "Test Mac"))
+
+    #expect(run.outcome == .pullConflict)
+    #expect(!fixture.exists(GitSupport.rebaseMarkerName, in: fixture.b))
+}
+
 @Test func ensureLocalDailyUnionMergeWritesOnceAndSkipsNonRepositories() throws {
     guard let fixture = try GitFixture() else { return }
     let url = fixture.a.gitDirectory.appending(path: "info/attributes")

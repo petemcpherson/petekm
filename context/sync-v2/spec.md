@@ -135,6 +135,13 @@ Network work happens first. Working-tree changes are then squeezed into the shor
 8. Return outcome; update SyncStatus (§8.1).
 ```
 
+**Untracked collision in 6b (added 2026-10-07).** A file created after 6a, such as the Pre-New-Day write (§6.5) or the first autosave of a new sticky, is untracked. `--autostash` skips untracked files. If upstream has the same path, the checkout refuses ("untracked working tree files would be overwritten") before any rebase starts. When 6b fails and no rebase is in progress, the engine settles the tree and retries once:
+
+- An untracked `daily/` sticky that is still blank (`DailyFiles.isBlankSticky`) and that upstream also has is deleted. The other Mac's copy then arrives. This is the same rule as `pruneIfBlank`: the deleted file holds nothing that reopening wouldn't compose again.
+- Every other untracked file is committed. `daily/` files then merge by union (§7).
+
+A failed 6b that never started a rebase has nothing to abort. The engine removes `.git/petekm-rebase` in that case too.
+
 Changes from v1's `GitSupport.sync`:
 
 - `pull --rebase` becomes `fetch` + `rebase @{upstream}`. The fetch already happened, so a second network round trip is wasted. Splitting them makes step 6 purely local, so it finishes in milliseconds.

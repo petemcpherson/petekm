@@ -1,7 +1,7 @@
 import Foundation
 
 /// Date <-> `daily/YYYY-MM-DD.md` conversions and the hard-coded English H1 date heading (§18.5).
-enum DailyDate {
+nonisolated enum DailyDate {
 
     static let filenameSuffix = ".md"
 

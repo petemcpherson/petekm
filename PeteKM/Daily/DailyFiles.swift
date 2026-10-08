@@ -14,7 +14,7 @@ enum DailyFiles {
     /// The most recent Daily Sticky strictly before `date`, if any.
     /// True when a Daily Sticky holds nothing but whitespace and, at most, its own date heading —
     /// a file indistinguishable from a day that was never opened.
-    static func isBlankSticky(_ text: String, for date: Date, calendar: Calendar = .current) -> Bool {
+    nonisolated static func isBlankSticky(_ text: String, for date: Date, calendar: Calendar = .current) -> Bool {
         let lines = text
             .split(whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespaces) }

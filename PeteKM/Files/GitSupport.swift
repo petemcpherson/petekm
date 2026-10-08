@@ -337,6 +337,34 @@ nonisolated enum GitSupport {
         return local.intersection(upstream).filter(isDailyStickyPath).sorted()
     }
 
+    static func isRebaseInProgress(_ folder: PeteKMFolder) -> Bool {
+        ["rebase-merge", "rebase-apply"].contains {
+            FileManager.default.fileExists(atPath: folder.gitDirectory.appending(path: $0).path(percentEncoded: false))
+        }
+    }
+
+    /// Before a retried rebase: an untracked Daily Sticky that is still blank and that
+    /// upstream also has is removed, so the other Mac's copy simply arrives. It holds
+    /// nothing a reopen wouldn't compose again, the same rule as `pruneIfBlank`.
+    /// Every other untracked file is left for the caller to commit, and `daily/`
+    /// union merge keeps both sides. True when anything untracked was found.
+    static func settleUntrackedBeforeRebase(_ folder: PeteKMFolder, runner: GitRunner, calendar: Calendar) -> Bool {
+        let listed = runner.run(["-c", "core.quotePath=false", "ls-files", "--others", "--exclude-standard"],
+                                in: folder.root, timeout: Timeouts.local)
+        guard listed.succeeded, !listed.output.isEmpty else { return false }
+
+        for path in listed.output.split(separator: "\n").map(String.init) where isDailyStickyPath(path) {
+            let url = folder.root.appending(path: path)
+            guard let day = DailyDate.date(fromFilename: url.lastPathComponent, calendar: calendar),
+                  let text = try? String(contentsOf: url, encoding: .utf8),
+                  DailyFiles.isBlankSticky(text, for: day, calendar: calendar),
+                  runner.run(["cat-file", "-e", "@{upstream}:\(path)"], in: folder.root, timeout: Timeouts.local).succeeded
+            else { continue }
+            try? FileManager.default.removeItem(at: url)
+        }
+        return true
+    }
+
     static func isDailyStickyPath(_ path: String) -> Bool {
         guard path.hasPrefix("daily/"), path.hasSuffix(".md") else { return false }
         return !path.dropFirst("daily/".count).contains("/")
@@ -486,17 +514,29 @@ nonisolated enum GitSupport {
             if let blocked = guardOutcome(folder, now: context.now, abortOwnRebase: abortOwnRebase) {
                 return finish(blocked)
             }
-            let merged = dailyPathsChangedOnBothSides(folder, runner: git)
+            var merged = dailyPathsChangedOnBothSides(folder, runner: git)
             let incoming = incomingDeviceName(folder, runner: git)
             FolderInitializer.ensureLocalDailyUnionMerge(folder)
 
             let marker = rebaseMarker(folder)
             FileManager.default.createFile(atPath: marker.path(percentEncoded: false), contents: nil)
-            let rebased = git.invoke(["rebase", "--autostash", "@{upstream}"], in: folder.root)
+            var rebased = git.invoke(["rebase", "--autostash", "@{upstream}"], in: folder.root)
+            // A file created after 6a (the Pre-New-Day write, or the first
+            // autosave of a new sticky) is untracked, and --autostash leaves
+            // untracked files alone. If upstream has the same path, the checkout
+            // refuses before the rebase starts. Settle the tree and try once more.
+            if !rebased.succeeded, !isRebaseInProgress(folder),
+               settleUntrackedBeforeRebase(folder, runner: git, calendar: context.calendar),
+               let again = commitIfDirty() {
+                result.didCommit = result.didCommit || again
+                merged = dailyPathsChangedOnBothSides(folder, runner: git)
+                rebased = git.invoke(["rebase", "--autostash", "@{upstream}"], in: folder.root)
+            }
             if !rebased.succeeded {
-                // Leave the marker if the abort itself failed: the next run's
-                // guard recognises the rebase as ours and retries the abort.
-                if abortOwnRebase() {
+                // A rebase that never started has nothing to abort. Leave the
+                // marker only if a real abort failed: the next run's guard
+                // recognises the rebase as ours and retries the abort.
+                if !isRebaseInProgress(folder) || abortOwnRebase() {
                     try? FileManager.default.removeItem(at: marker)
                 }
                 recordCounts()
