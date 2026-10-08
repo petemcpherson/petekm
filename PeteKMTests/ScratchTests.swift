@@ -228,6 +228,20 @@ private func remove(_ folder: PeteKMFolder) {
     #expect(settings.groundIsDark(systemIsDark: false))
 }
 
+@Test func windowAppearanceFollowsACustomBackground() throws {
+    let suite = try #require(UserDefaults(suiteName: "petekm.tests.appearance.\(UUID().uuidString)"))
+    defer { suite.removeSuite(named: suite.description) }
+
+    let settings = AppSettings(defaults: suite)
+    #expect(settings.windowAppearance == nil)
+
+    settings.backgroundHex = "#FFFF00"
+    #expect(settings.windowAppearance?.name == .aqua)
+
+    settings.backgroundHex = "#101014"
+    #expect(settings.windowAppearance?.name == .darkAqua)
+}
+
 @MainActor
 @Test func scratchDotTilesAreCachedPerGround() {
     #expect(ScratchTexture.dots(dark: true) === ScratchTexture.dots(dark: true))

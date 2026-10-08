@@ -118,6 +118,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             _ = settings.floatOnTop
             _ = settings.hideDockIcon
             _ = settings.hideMenuBarItem
+            _ = settings.backgroundHex
         } onChange: {
             Task { @MainActor [weak self] in
                 self?.applySettings()
@@ -174,6 +175,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func applySettings() {
         GlobalHotKeyMonitor.shared.update(to: settings.globalShortcut)
         windowController?.setFloatsOnTop(settings.floatOnTop)
+        windowController?.window.appearance = settings.windowAppearance
         NSApp.setActivationPolicy(settings.hideDockIcon ? .accessory : .regular)
         menuBar.setVisible(settings.menuBarItemVisible)
     }

@@ -330,37 +330,48 @@ struct DailyStickyView: View {
         }
     }
 
+    /// Header text and icons follow the custom text color when one is set, so they match the
+    /// editor on a custom background. Otherwise the system color, which the window's
+    /// appearance already flips to suit the background.
+    private func ink(_ system: Color, alpha: Double = 1) -> Color {
+        settings.textColor.map { Color(nsColor: $0).opacity(alpha) } ?? system
+    }
+
     private func header(_ session: DailySession) -> some View {
         HStack(spacing: DS.Space.s4) {
             PixelMark(size: 16)
             Text(session.openedTitle)
                 .font(DS.Text.uiLabel)
-                .foregroundStyle(DS.Color.textPrimary)
+                .foregroundStyle(ink(DS.Color.textPrimary))
             Text(session.openedFileName)
                 .font(DS.Text.monoCaption)
-                .foregroundStyle(DS.Color.textTertiary)
+                .foregroundStyle(ink(DS.Color.textTertiary, alpha: 0.55))
             Spacer(minLength: 0)
             Button {
                 palette.present()
             } label: {
                 Image(systemName: "magnifyingglass")
+                    .foregroundStyle(ink(DS.Color.textPrimary))
             }
             .help("Command Palette (⌘K)")
             Toggle(isOn: Binding(get: { settings.floatOnTop },
                                  set: { settings.floatOnTop = $0 })) {
                 Image(systemName: settings.floatOnTop ? "pin.fill" : "pin")
+                    .foregroundStyle(ink(DS.Color.textPrimary))
             }
             .toggleStyle(.button)
             .help("Float Above Other Apps")
             Toggle(isOn: Binding(get: { settings.showTableOfContents },
                                  set: { settings.showTableOfContents = $0 })) {
                 Image(systemName: "list.bullet")
+                    .foregroundStyle(ink(DS.Color.textPrimary))
             }
             .toggleStyle(.button)
             .help("Table of Contents")
             Toggle(isOn: Binding(get: { settings.scratchVisible },
                                  set: { settings.scratchVisible = $0 })) {
                 Image(systemName: "note.text")
+                    .foregroundStyle(ink(DS.Color.textPrimary))
             }
             .toggleStyle(.button)
             .help("Scratch (⌘⇧S)")
@@ -374,7 +385,7 @@ struct DailyStickyView: View {
                 // External tools report here and then get out of the way.
                 Text(notice)
                     .font(DS.Text.caption)
-                    .foregroundStyle(DS.Color.textSecondary)
+                    .foregroundStyle(ink(DS.Color.textSecondary, alpha: 0.55))
                     .lineLimit(1)
                     .help(notice)
                     .transition(.opacity)

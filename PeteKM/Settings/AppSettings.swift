@@ -188,6 +188,14 @@ final class AppSettings {
         return luminance < 0.5
     }
 
+    /// The appearance the sticky window should draw with. A custom background picks light or
+    /// dark from its own luminance so system label colors (header, icons, editor text) stay
+    /// legible on it; with no custom background the window follows the system.
+    var windowAppearance: NSAppearance? {
+        guard backgroundColor != nil else { return nil }
+        return NSAppearance(named: groundIsDark(systemIsDark: false) ? .darkAqua : .aqua)
+    }
+
     /// Whether the Scratch pane is expanded. The pane's strip is always visible; this
     /// only decides whether the editor under it is showing.
     var scratchVisible: Bool {
