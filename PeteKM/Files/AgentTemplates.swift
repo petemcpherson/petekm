@@ -435,7 +435,7 @@ enum AgentTemplates {
     private static let process = """
     ---
     name: petekm-process
-    description: File new Daily Stickies into the Library. With no argument, process every Daily Sticky newer than the last processed one, oldest-first; pass a date, filename, or plain-language date to reprocess just that day. Use when the user asks to process, file, catch up on, or organize notes in a PeteKM folder, or invokes /petekm-process.
+    description: File new Daily Stickies into the Library. With no argument, process every Daily Sticky newer than the last processed one, oldest-first, skipping today's (still being written); pass a date, filename, or plain-language date to reprocess just that day. Use when the user asks to process, file, catch up on, or organize notes in a PeteKM folder, or invokes /petekm-process.
     ---
 
     # Process Daily Stickies
@@ -458,17 +458,22 @@ enum AgentTemplates {
        against a repo mid-conflict, and never guess which side is right.
     1. **Pick the target Daily Stickies.**
        - **No argument (the common case):** read `lastProcessedDailyNote` from
-         `.petekm-state.json` and list every `daily/*.md` whose date is newer.
-         Process them **oldest-first, one file at a time**, so later days can build
-         on Library files the earlier days created. It makes no difference whether
-         the app created a file or the user dropped it in by hand — a Daily Sticky
-         is just `daily/YYYY-MM-DD.md`. If the state file is missing or the marker
-         is null, ask which day to start from rather than processing everything.
+         `.petekm-state.json` and list every `daily/*.md` whose date is newer
+         **and earlier than today** (local date). Skip today's Daily Sticky: the
+         user is still writing in it, and it is picked up on the first run after
+         today ends. Process them **oldest-first, one file at a time**, so later
+         days can build on Library files the earlier days created. It makes no
+         difference whether the app created a file or the user dropped it in by
+         hand — a Daily Sticky is just `daily/YYYY-MM-DD.md`. If the state file is
+         missing or the marker is null, ask which day to start from rather than
+         processing everything.
        - **One argument:** resolve it to a single daily file — accept `2026-08-19`,
          `2026-08-19.md`, `daily/2026-08-19.md`, or a plain-language date. Ambiguous
          → ask. Missing → list nearby existing Daily Stickies and stop. Process only
-         that day, regardless of the state marker.
-       - Nothing newer to process → say so and stop.
+         that day, regardless of the state marker. Today is allowed here.
+       - Nothing to process → say so and stop. If only today's Daily Sticky is
+         waiting, say it will be processed tomorrow, or now with
+         `/petekm-process today`.
     2. Read the Daily Sticky in full. Do not modify it in any way.
     3. Check `INDEX.md` freshness: if any path in its Files section no longer
        exists, or `find library -name '*.md' -newer INDEX.md` prints anything,
@@ -493,7 +498,9 @@ enum AgentTemplates {
     11. On success, update `.petekm-state.json`: `lastSuccessfulProcessing` (ISO
         8601, local offset), and `lastProcessedDailyNote` **only if** this run
         processed a note newer than the recorded one. Back-filling or reprocessing
-        an older day never moves the marker backward or falsely forward.
+        an older day never moves the marker backward or falsely forward. Never set
+        the marker to today or later, even when today was processed by argument:
+        today is still being written, so the next run must see it again.
     12. **Commit and publish.** Run:
 
         ```bash
@@ -633,6 +640,7 @@ enum AgentTemplates {
        `.petekm-state.json` (say so plainly if the file is missing — it is
        disposable, and its absence only means state was lost, not that filing failed).
     2. Daily Stickies newer than `lastProcessedDailyNote`, listed oldest-first.
+       Mark today's as "in progress — processed after today ends".
     3. Library size: file count, and count per top-level folder.
     4. Whether `INDEX.md` looks stale — any Library file newer than it, any Files
        path that no longer resolves, or any top-level folder missing from Areas.

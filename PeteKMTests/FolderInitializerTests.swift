@@ -219,6 +219,8 @@ struct AgentTemplateTests {
         #expect(process.contains("git push"))
         #expect(!process.contains("--force"))
         #expect(process.contains("lastProcessedDailyNote"))
+        #expect(process.contains("**and earlier than today**"))
+        #expect(process.contains("Never set\n    the marker to today or later"))
         #expect(AgentTemplates.claudeMd.contains("/petekm-process` —"))
         #expect(!AgentTemplates.claudeMd.contains("process-today"))
         #expect(AgentTemplates.skill("petekm-status").contains("@{upstream}"))
