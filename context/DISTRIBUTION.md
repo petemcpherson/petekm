@@ -219,6 +219,7 @@ Add a row every release. The build number must always increase.
 | --- | --- | --- | --- |
 | 1.0.0 | 1 | 2026-10-06 | First public release. |
 | 1.0.1 | 2 | 2026-10-08 | Sync fix for a new Daily Sticky on both Macs; legible text on custom backgrounds. |
+| 1.0.2 | 3 | 2026-10-26 | Process skips today's Daily Sticky by default; marker never set to today. |
 
 ---
 
