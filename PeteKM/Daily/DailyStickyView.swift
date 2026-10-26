@@ -315,18 +315,24 @@ struct DailyStickyView: View {
                 FolderInitializer.agentFilesAreOutOfDate(folder)
             }.value
             guard outOfDate else { return }
-            settings.agentFilesNoticeShownFor = fingerprint
-            show("Agent files are out of date. Settings → Folder → Refresh Agent Files.", seconds: 15)
+            // Recorded only once the notice stays up its full time: a launch sync
+            // notice can replace it within a second, and then it must come back.
+            show("Agent files are out of date. Settings → Folder → Refresh Agent Files.",
+                 seconds: 15) {
+                settings.agentFilesNoticeShownFor = fingerprint
+            }
         }
     }
 
-    private func show(_ text: String, seconds: Double = 6) {
+    /// `onShownFully` runs only if no other notice replaced this one before it timed out.
+    private func show(_ text: String, seconds: Double = 6, onShownFully: (() -> Void)? = nil) {
         noticeTask?.cancel()
         notice = text
         noticeTask = Task { @MainActor in
             try? await Task.sleep(for: .seconds(seconds))
             guard !Task.isCancelled else { return }
             notice = nil
+            onShownFully?()
         }
     }
 
