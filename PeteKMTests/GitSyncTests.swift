@@ -508,7 +508,9 @@ private func fakeRepository() throws -> PeteKMFolder {
 
 @Test func dailyStickyPathMatchesTheAttributePattern() {
     #expect(GitSupport.isDailyStickyPath("daily/2026-10-05.md"))
+    #expect(GitSupport.isDailyStickyPath("daily/2026/10/2026-10-05.md"))
     #expect(!GitSupport.isDailyStickyPath("daily/sub/2026-10-05.md"))
+    #expect(!GitSupport.isDailyStickyPath("daily/2026/2026-10-05.md"))
     #expect(!GitSupport.isDailyStickyPath("library/daily/2026-10-05.md"))
     #expect(!GitSupport.isDailyStickyPath("daily/notes.txt"))
 }
@@ -526,6 +528,8 @@ private func lines(_ data: Data) -> Set<Substring> {
     #expect(fixture.git(["ls-files", ".gitattributes"], in: fixture.a) == ".gitattributes")
     #expect(fixture.git(["check-attr", "merge", "daily/2026-10-05.md"], in: fixture.b)
             == "daily/2026-10-05.md: merge: union")
+    #expect(fixture.git(["check-attr", "merge", "daily/2026/10/2026-10-05.md"], in: fixture.b)
+            == "daily/2026/10/2026-10-05.md: merge: union")
     #expect(fixture.git(["check-attr", "merge", "library/note.md"], in: fixture.b)
             == "library/note.md: merge: unspecified")
 }

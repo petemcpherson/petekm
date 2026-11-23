@@ -156,7 +156,8 @@ private struct GuideProcessArticle: View {
 private struct GuideBackfillArticle: View {
     var body: some View {
         GuideSection("Backfilling Notes") {
-            GuideLine("Backfilling old notes works. Put each one in `daily/` named exactly `YYYY-MM-DD.md` — the filename is the date.")
+            GuideLine("Daily Stickies are filed by month: `daily/2026/08/2026-08-19.md`. PeteKM does the filing.")
+            GuideLine("Backfilling old notes works. Drop each one in `daily/` named exactly `YYYY-MM-DD.md` — the filename is the date. PeteKM moves it into its month folder.")
             GuideLine("Then just run Process. Plain `/petekm-process` picks up everything newer than the last processed day, oldest-first, whether the app created the file or you did.")
             GuideLine("To redo one specific day, pass it a date:")
             GuideCode("/petekm-process 2026-08-11")

@@ -25,7 +25,6 @@ final class DailySession {
     private let folder: PeteKMFolder
     private let settings: AppSettings
     private let calendar: Calendar
-    private var watcher: DirectoryWatcher?
     private var openedFileWatcher: DirectoryWatcher?
 
     /// Absent in tests and before the view wires it: then today's file is written at once, as v1.
@@ -44,8 +43,8 @@ final class DailySession {
         self.newDayBudget = newDayBudget
         self.calendar = calendar
         self.openedDate = calendar.startOfDay(for: now)
+        DailyFiles.organize(folder, calendar: calendar)
         openToday(now: now)
-        startWatching()
     }
 
     var openedFileName: String {
@@ -78,10 +77,9 @@ final class DailySession {
         openedIsDaily = true
         revealRange = nil
         newDayOptions = nil
-        openedFileWatcher = nil
         cancelDeferral()
 
-        let url = folder.dailySticky(for: day, calendar: calendar)
+        let url = DailyFiles.existingSticky(for: day, in: folder, calendar: calendar)
         if FileWriting.exists(url) {
             adopt(StickyDocument(url: url, text: FileWriting.readText(url) ?? ""))
             return
@@ -129,21 +127,29 @@ final class DailySession {
         revealRange = reveal
         adopt(StickyDocument(url: url, text: text))
         lastError = nil
-        watchOpenedFile()
     }
 
-    /// The date behind `daily/YYYY-MM-DD.md`, or nil for anything else.
+    /// The date behind a `YYYY-MM-DD.md` anywhere under `daily/` — the dated
+    /// `daily/YYYY/MM/` path or a not-yet-organized flat file — or nil for anything else.
     private func dailyDate(for url: URL) -> Date? {
-        let parent = url.deletingLastPathComponent().standardizedFileURL
-        guard parent == folder.daily.standardizedFileURL else { return nil }
+        let dailyPath = folder.daily.standardizedFileURL.path(percentEncoded: false)
+        let prefix = dailyPath.hasSuffix("/") ? dailyPath : dailyPath + "/"
+        guard url.standardizedFileURL.path(percentEncoded: false).hasPrefix(prefix) else { return nil }
         return DailyDate.date(fromFilename: url.lastPathComponent, calendar: calendar)
+    }
+
+    /// Files stray Daily Stickies into `daily/YYYY/MM/` — the ones a sync just brought in from
+    /// a Mac on an older version, or the user dropped in by hand. The open document's own
+    /// file is left alone so its URL never goes stale under the editor; a later pass gets it.
+    func organizeDailies() {
+        DailyFiles.organize(folder, skipping: document?.url, calendar: calendar)
     }
 
     /// Answer to the New Day prompt. Today's file may have arrived from the other Mac while
     /// the prompt was up; then it opens instead (sync v2 §6.5 step 4).
     func startNewDay(_ start: NewDayStart) {
         newDayOptions = nil
-        if FileWriting.exists(folder.dailySticky(for: openedDate, calendar: calendar)) {
+        if FileWriting.exists(DailyFiles.existingSticky(for: openedDate, in: folder, calendar: calendar)) {
             open(date: openedDate)
             return
         }
@@ -206,6 +212,7 @@ final class DailySession {
         outgoing?.saveNow()
         pruneIfBlank(outgoing)
         self.document = document
+        watchOpenedFile()
     }
 
     // MARK: - Pre-New-Day (sync v2 §6.5)
@@ -257,13 +264,13 @@ final class DailySession {
     /// With "Ask me each day" the prompt is the wait: sync while it is up, and if today's file
     /// arrives before an answer, open it and drop the prompt.
     private func syncWhilePrompting(for day: Date) {
-        let url = folder.dailySticky(for: day, calendar: calendar)
         guard let autoSync, openedAsToday, autoSync.canDeferNewDay(in: folder) else { return }
         deferralRun = Task { [weak self] in
             await autoSync.request(.newDay)
             guard !Task.isCancelled, let self, self.newDayOptions != nil,
                   self.calendar.isDate(self.openedDate, inSameDayAs: day),
-                  FileWriting.exists(url) else { return }
+                  FileWriting.exists(DailyFiles.existingSticky(for: day, in: self.folder, calendar: self.calendar))
+            else { return }
             self.open(date: day)
         }
     }
@@ -289,6 +296,22 @@ final class DailySession {
         else { return }
 
         try? FileManager.default.removeItem(at: document.url)
+        removeEmptyDailyFolders(above: document.url)
+    }
+
+    /// A pruned sticky can leave `daily/YYYY/MM/` (and `daily/YYYY/`) empty. Never touches
+    /// `daily/` itself or a folder that still holds anything.
+    private func removeEmptyDailyFolders(above url: URL) {
+        let fm = FileManager.default
+        let daily = folder.daily.standardizedFileURL
+        var directory = url.deletingLastPathComponent().standardizedFileURL
+        while directory != daily, directory.path(percentEncoded: false).hasPrefix(daily.path(percentEncoded: false)) {
+            guard let contents = try? fm.contentsOfDirectory(atPath: directory.path(percentEncoded: false)),
+                  contents.allSatisfy({ $0 == ".DS_Store" })
+            else { return }
+            try? fm.removeItem(at: directory)
+            directory = directory.deletingLastPathComponent().standardizedFileURL
+        }
     }
 
     // MARK: - Lifecycle
@@ -308,19 +331,16 @@ final class DailySession {
         pruneIfBlank(document)
     }
 
-    private func startWatching() {
-        try? FileManager.default.createDirectory(at: folder.daily, withIntermediateDirectories: true)
-        watcher = DirectoryWatcher(url: folder.daily) { [weak self] in
-            Task { @MainActor [weak self] in self?.document?.reconcileWithDisk() }
-        }
-    }
-
-    /// Library files live outside `daily/`, so they need their own watch (§8.5).
+    /// Watches the open document's own folder — `daily/YYYY/MM/` or wherever in the
+    /// Library — so outside edits show up (§8.5). A deferred new sticky's month folder may
+    /// not exist yet; it is created so the arriving file is still seen.
     private func watchOpenedFile() {
-        guard let directory = document?.url.deletingLastPathComponent().standardizedFileURL,
-              directory != folder.daily.standardizedFileURL else {
+        guard let directory = document?.url.deletingLastPathComponent().standardizedFileURL else {
             openedFileWatcher = nil
             return
+        }
+        if dailyDate(for: document?.url ?? directory) != nil {
+            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         }
         openedFileWatcher = DirectoryWatcher(url: directory) { [weak self] in
             Task { @MainActor [weak self] in self?.document?.reconcileWithDisk() }

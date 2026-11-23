@@ -588,7 +588,10 @@ final class AutoSync {
         let session = session
         let context = GitSupport.SyncContext(
             flush: { [weak session] in session?.flush() },
-            reconcile: { [weak session] in session?.document?.reconcileWithDisk() },
+            reconcile: { [weak session] in
+                session?.organizeDailies()
+                session?.document?.reconcileWithDisk()
+            },
             deadline: deadline(for: triggers),
             allowRebase: allowRebase,
             localOnly: localOnly,

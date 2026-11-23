@@ -50,8 +50,23 @@ nonisolated struct PeteKMFolder: Equatable, Hashable {
 
     /// A Daily Sticky path for a local calendar date (§5.1). Filenames are
     /// machine-generated; the user never names these files.
+    /// `daily/YYYY/MM/YYYY-MM-DD.md` — where a Daily Sticky lives. The filename keeps the
+    /// full date so a file still says which day it is if it is ever copied out.
     func dailySticky(for date: Date, calendar: Calendar = .current) -> URL {
+        root.appending(path: PeteKMFolder.dailyRelativePath(for: date, calendar: calendar))
+    }
+
+    /// The pre-1.0.4 flat location, `daily/YYYY-MM-DD.md`. Still read until `DailyFiles.organize`
+    /// moves it, and still what an older app version on another Mac writes.
+    func flatDailySticky(for date: Date, calendar: Calendar = .current) -> URL {
         daily.appending(path: PeteKMFolder.dailyFilename(for: date, calendar: calendar))
+    }
+
+    /// `daily/2026/08/2026-08-19.md`
+    static func dailyRelativePath(for date: Date, calendar: Calendar = .current) -> String {
+        let parts = calendar.dateComponents([.year, .month], from: date)
+        return String(format: "daily/%04d/%02d/", parts.year ?? 0, parts.month ?? 0)
+            + dailyFilename(for: date, calendar: calendar)
     }
 
     static func dailyFilename(for date: Date, calendar: Calendar = .current) -> String {

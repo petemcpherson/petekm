@@ -69,12 +69,13 @@ enum AgentTemplates {
     /// stopping on a conflict. Every other path keeps the abort-and-pause behavior.
     static let gitattributes = """
     # PeteKM: same-day Daily Stickies from two Macs keep both sets of lines.
-    daily/*.md merge=union
+    daily/**/*.md merge=union
     """
 
-    /// The line `.gitattributes` must carry. Appended to an existing file on folders
-    /// created before sync v2 — a missed line only means a same-day edit pauses sync.
-    static let dailyUnionLine = "daily/*.md merge=union"
+    /// The line `.gitattributes` must carry. `**/` matches zero or more folders, so it
+    /// covers both `daily/YYYY/MM/` and the pre-1.0.4 flat files. Appended to an existing
+    /// file on older folders — a missed line only means a same-day edit pauses sync.
+    static let dailyUnionLine = "daily/**/*.md merge=union"
 
     // MARK: - .petekm-state.json (§5.7)
 
@@ -95,7 +96,8 @@ enum AgentTemplates {
 
     ## Layout
 
-    - `daily/YYYY-MM-DD.md` — Daily Stickies. Raw, unedited daily capture.
+    - `daily/YYYY/MM/YYYY-MM-DD.md` — Daily Stickies. Raw, unedited daily capture,
+      filed by year and month (e.g. `daily/2026/08/2026-08-19.md`).
     - `library/**.md` — the Library. Durable, organized knowledge.
     - `INDEX.md` — a map of the Library.
     - `INBOX.md` — items that could not confidently be filed (created only when needed).
@@ -109,6 +111,9 @@ enum AgentTemplates {
     `daily/` is read-only source material. Never edit, rewrite, reformat, rename,
     move, delete, summarize, tag, link, or add "processed" markers to any file in
     `daily/`. Not to fix a typo. Not to add a heading. Not once.
+
+    The PeteKM app files Daily Stickies into their year/month folders itself. That is
+    not your job: if one sits somewhere else in `daily/`, read it there and leave it.
 
     If you need to record processing state, write it to `.petekm-state.json`.
 
@@ -237,18 +242,21 @@ enum AgentTemplates {
     Markdown, no wikilink syntax, no citation bureaucracy:
 
     ```md
-    Source: `daily/2026-08-19.md`
+    Source: `daily/2026/08/2026-08-19.md`
     ```
 
     or:
 
     ```md
     Sources:
-    - `daily/2026-08-18.md`
-    - `daily/2026-08-19.md`
+    - `daily/2026/08/2026-08-18.md`
+    - `daily/2026/08/2026-08-19.md`
     ```
 
-    The goal is traceability back to the ledger.
+    The goal is traceability back to the ledger. Older lines may name the flat
+    `daily/2026-08-19.md` path from before Daily Stickies were filed by month. The
+    date in the filename is what identifies the day, so those still count; there is
+    no need to rewrite them.
 
     ## 6. Prefer updating over proliferating
 
@@ -458,17 +466,19 @@ enum AgentTemplates {
        against a repo mid-conflict, and never guess which side is right.
     1. **Pick the target Daily Stickies.**
        - **No argument (the common case):** read `lastProcessedDailyNote` from
-         `.petekm-state.json` and list every `daily/*.md` whose date is newer
+         `.petekm-state.json` and list every Daily Sticky under `daily/` (they sit in
+         `daily/YYYY/MM/`; a few older ones may still be flat in `daily/`) whose date is newer
          **and earlier than today** (local date). Skip today's Daily Sticky: the
          user is still writing in it, and it is picked up on the first run after
          today ends. Process them **oldest-first, one file at a time**, so later
          days can build on Library files the earlier days created. It makes no
          difference whether the app created a file or the user dropped it in by
-         hand — a Daily Sticky is just `daily/YYYY-MM-DD.md`. If the state file is
+         hand — a Daily Sticky is any `YYYY-MM-DD.md` under `daily/`, and the
+         filename is the date. If the state file is
          missing or the marker is null, ask which day to start from rather than
          processing everything.
        - **One argument:** resolve it to a single daily file — accept `2026-08-19`,
-         `2026-08-19.md`, `daily/2026-08-19.md`, or a plain-language date. Ambiguous
+         `2026-08-19.md`, `daily/2026/08/2026-08-19.md`, or a plain-language date. Ambiguous
          → ask. Missing → list nearby existing Daily Stickies and stop. Process only
          that day, regardless of the state marker. Today is allowed here.
        - Nothing to process → say so and stop. If only today's Daily Sticky is
@@ -608,7 +618,8 @@ enum AgentTemplates {
        - several thin files that clearly belong together;
        - unclear or inconsistent filenames;
        - folders with one file, or folders that have grown shapeless;
-       - `INDEX.md` paths that no longer resolve.
+       - `INDEX.md` paths that no longer resolve. (A `Source:` line naming a flat
+         `daily/YYYY-MM-DD.md` is not broken — that day now lives in `daily/YYYY/MM/`.)
     3. **Propose the plan and wait for agreement before changing anything.** List
        each move, merge, rename, and deletion explicitly.
     4. On approval, execute carefully:

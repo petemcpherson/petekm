@@ -226,6 +226,91 @@ struct DailyFilesTests {
 
         #expect(DailyFiles.mostRecentSticky(before: day(2026, 8, 19), in: folder) == nil)
     }
+
+    // MARK: Year/month filing
+
+    @Test func organizeMovesFlatStickiesIntoMonthFolders() throws {
+        let folder = try makeTemporaryFolder()
+        defer { remove(folder) }
+
+        try FileWriting.writeAtomically("nov", to: folder.flatDailySticky(for: day(2026, 11, 30)))
+        try FileWriting.writeAtomically("dec", to: folder.flatDailySticky(for: day(2026, 12, 1)))
+        try FileWriting.writeAtomically("jan", to: folder.flatDailySticky(for: day(2027, 1, 2)))
+        try FileWriting.writeAtomically("x", to: folder.daily.appending(path: "notes.md"))
+
+        let moved = DailyFiles.organize(folder)
+
+        #expect(moved.count == 3)
+        #expect(FileWriting.readText(folder.daily.appending(path: "2026/11/2026-11-30.md")) == "nov")
+        #expect(FileWriting.readText(folder.daily.appending(path: "2026/12/2026-12-01.md")) == "dec")
+        #expect(FileWriting.readText(folder.daily.appending(path: "2027/01/2027-01-02.md")) == "jan")
+        #expect(!FileWriting.exists(folder.flatDailySticky(for: day(2026, 11, 30))))
+        #expect(FileWriting.exists(folder.daily.appending(path: "notes.md")))
+        // A second pass has nothing left to do.
+        #expect(DailyFiles.organize(folder).isEmpty)
+    }
+
+    @Test func organizeNeverOverwritesADifferentDatedFile() throws {
+        let folder = try makeTemporaryFolder()
+        defer { remove(folder) }
+        let date = day(2026, 11, 23)
+
+        try FileWriting.writeAtomically("new layout", to: folder.dailySticky(for: date))
+        try FileWriting.writeAtomically("older app", to: folder.flatDailySticky(for: date))
+
+        #expect(DailyFiles.organize(folder).isEmpty)
+        #expect(FileWriting.readText(folder.dailySticky(for: date)) == "new layout")
+        #expect(FileWriting.readText(folder.flatDailySticky(for: date)) == "older app")
+        // The dated file is the one read.
+        #expect(DailyFiles.stickyFiles(in: folder)[date] == folder.dailySticky(for: date).standardizedFileURL)
+    }
+
+    @Test func organizeDropsAStrayIdenticalToTheDatedFile() throws {
+        let folder = try makeTemporaryFolder()
+        defer { remove(folder) }
+        let date = day(2026, 11, 23)
+
+        try FileWriting.writeAtomically("same", to: folder.dailySticky(for: date))
+        try FileWriting.writeAtomically("same", to: folder.flatDailySticky(for: date))
+
+        DailyFiles.organize(folder)
+        #expect(!FileWriting.exists(folder.flatDailySticky(for: date)))
+        #expect(FileWriting.readText(folder.dailySticky(for: date)) == "same")
+    }
+
+    @Test func organizeLeavesTheOpenFileAlone() throws {
+        let folder = try makeTemporaryFolder()
+        defer { remove(folder) }
+        let flat = folder.flatDailySticky(for: day(2026, 11, 23))
+        try FileWriting.writeAtomically("open", to: flat)
+
+        #expect(DailyFiles.organize(folder, skipping: flat).isEmpty)
+        #expect(FileWriting.exists(flat))
+    }
+
+    @Test func readsFlatAndNestedStickiesAlike() throws {
+        let folder = try makeTemporaryFolder()
+        defer { remove(folder) }
+
+        try FileWriting.writeAtomically("## Old\n", to: folder.flatDailySticky(for: day(2026, 8, 10)))
+        try FileWriting.writeAtomically("## New\n", to: folder.dailySticky(for: day(2026, 8, 17)))
+
+        #expect(DailyFiles.stickyDates(in: folder) == [day(2026, 8, 10), day(2026, 8, 17)])
+        #expect(DailyFiles.existingSticky(for: day(2026, 8, 10), in: folder) == folder.flatDailySticky(for: day(2026, 8, 10)))
+        #expect(DailyFiles.mostRecentSticky(before: day(2026, 8, 17), in: folder)?.lastPathComponent == "2026-08-10.md")
+    }
+
+    @MainActor @Test func sessionOrganizesOnOpen() throws {
+        let folder = try makeTemporaryFolder()
+        defer { remove(folder) }
+        let past = day(2026, 1, 5)
+        try FileWriting.writeAtomically("history", to: folder.flatDailySticky(for: past))
+
+        _ = DailySession(folder: folder, settings: AppSettings(defaults: UserDefaults(suiteName: UUID().uuidString)!))
+
+        #expect(!FileWriting.exists(folder.flatDailySticky(for: past)))
+        #expect(FileWriting.readText(folder.dailySticky(for: past)) == "history")
+    }
 }
 
 // MARK: - Document write safety
@@ -794,7 +879,7 @@ struct PreNewDayTests {
 
     @Test func secondMacAdoptsTheFirstMacsNewDay() async throws {
         guard let fixture = try await Task.detached(operation: { try GitFixture() }).value else { return }
-        let path = "daily/" + DailyDate.filename(for: Date())
+        let path = PeteKMFolder.dailyRelativePath(for: Date())
 
         let settingsA = settings()
         let macA = autoSync(ProcessGitRunner(), settingsA, device: "Mac A")

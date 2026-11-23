@@ -395,7 +395,7 @@ final class PaletteModel {
         if let typed = PaletteDateInput.parse(query, calendar: calendar) {
             rows.append(PaletteRow(id: "typed-\(DailyDate.stamp(for: typed, calendar: calendar))",
                                    title: DailyDate.longForm(typed, calendar: calendar),
-                                   subtitle: "daily/" + DailyDate.filename(for: typed, calendar: calendar),
+                                   subtitle: PeteKMFolder.dailyRelativePath(for: typed, calendar: calendar),
                                    snippet: nil,
                                    kind: .day(typed)))
         }
@@ -420,7 +420,7 @@ final class PaletteModel {
         rows.append(contentsOf: existing.map { date in
             PaletteRow(id: DailyDate.stamp(for: date, calendar: calendar),
                        title: DailyDate.longForm(date, calendar: calendar),
-                       subtitle: "daily/" + DailyDate.filename(for: date, calendar: calendar),
+                       subtitle: PeteKMFolder.dailyRelativePath(for: date, calendar: calendar),
                        snippet: nil,
                        kind: .day(date))
         })

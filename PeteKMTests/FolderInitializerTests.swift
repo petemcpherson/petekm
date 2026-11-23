@@ -346,7 +346,9 @@ struct PeteKMFolderTests {
         let url = folder.dailySticky(for: date)
 
         #expect(url.lastPathComponent == "2026-12-25.md")
-        #expect(url.deletingLastPathComponent().lastPathComponent == "daily")
+        #expect(url.path(percentEncoded: false).hasSuffix("/daily/2026/12/2026-12-25.md"))
+        #expect(PeteKMFolder.dailyRelativePath(for: date, calendar: Calendar(identifier: .gregorian))
+                == "daily/2026/12/2026-12-25.md")
     }
 
     @Test func looksInitializedOnlyAfterSetup() throws {

@@ -321,8 +321,7 @@ nonisolated enum GitSupport {
     // MARK: - Merged-daily detector (sync v2 §7.3)
 
     /// `daily/*.md` paths changed both locally and upstream since the merge base.
-    /// Call before the rebase. Matches the `.gitattributes` pattern: direct
-    /// children of `daily/` only.
+    /// Call before the rebase. Matches the `.gitattributes` pattern.
     static func dailyPathsChangedOnBothSides(_ folder: PeteKMFolder, runner: GitRunner = ProcessGitRunner()) -> [String] {
         let base = runner.run(["merge-base", "HEAD", "@{upstream}"], in: folder.root, timeout: Timeouts.local)
         guard base.succeeded, !base.output.isEmpty else { return [] }
@@ -365,9 +364,17 @@ nonisolated enum GitSupport {
         return true
     }
 
+    /// `daily/YYYY/MM/<file>.md`, or the pre-1.0.4 flat `daily/<file>.md` an older
+    /// version on another Mac may still write.
     static func isDailyStickyPath(_ path: String) -> Bool {
         guard path.hasPrefix("daily/"), path.hasSuffix(".md") else { return false }
-        return !path.dropFirst("daily/".count).contains("/")
+        let parts = path.dropFirst("daily/".count).split(separator: "/", omittingEmptySubsequences: false)
+        switch parts.count {
+        case 1: return true
+        case 3: return parts[0].count == 4 && parts[1].count == 2
+                    && parts[0].allSatisfy(\.isNumber) && parts[1].allSatisfy(\.isNumber)
+        default: return false
+        }
     }
 
     // MARK: - The run (sync v2 §6.1)

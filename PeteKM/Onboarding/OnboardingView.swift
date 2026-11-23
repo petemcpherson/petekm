@@ -334,7 +334,7 @@ struct OnboardingView: View {
             VStack(alignment: .leading, spacing: DS.Space.s2) {
                 Text("Bring in notes you already have")
                     .font(DS.Text.uiLabel)
-                Text("Copy existing Markdown into `library/`. Dated journals can go in `daily/` instead if they're named `YYYY-MM-DD.md` — but anything there is a read-only ledger from then on, so put everything else in `library/`.")
+                Text("Copy existing Markdown into `library/`. Dated journals can go in `daily/` instead if they're named `YYYY-MM-DD.md` — PeteKM files them by month — but anything there is a read-only ledger from then on, so put everything else in `library/`.")
                     .font(DS.Text.callout)
                     .foregroundStyle(DS.Color.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)

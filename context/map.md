@@ -110,14 +110,14 @@ Targets: `PeteKM` (app), `PeteKMTests` (**Swift Testing** — `@Test`/`#expect`)
 What `FolderInitializer` produces in a user's PeteKM folder (spec §5):
 
 ```
-daily/YYYY-MM-DD.md          immutable ledger, AI never writes
+daily/YYYY/MM/YYYY-MM-DD.md  immutable ledger, AI never writes; app files by month
 library/**.md                mutable knowledge, AI curates
 .claude/skills/petekm-{process,rebuild-index,organize,status}/SKILL.md
 INDEX.md   CLAUDE.md   AGENTS.md   INBOX.md
 .petekm-state.json           disposable agent state
 .petekm-scratch.md           Scratch pane; not a note (see Layer 3b)
 .gitignore
-.gitattributes               daily/*.md merge=union (sync v2 §7)
+.gitattributes               daily/**/*.md merge=union (sync v2 §7)
 ```
 
 ### State outside the folder
@@ -151,7 +151,7 @@ The capture loop. Read `DailySession` first.
 | --- | --- |
 | `DailySession.swift` | `@MainActor @Observable` orchestrator. `pruneIfBlank` deletes a blank Daily Sticky on flush or on leaving it — a day written entirely in Scratch leaves no file (never a Library file, never dirty or conflicted, blank in memory *and* on disk). Owns `openedDate`, the open `StickyDocument`, New Day prompt state, `openedAsToday` / `openedIsDaily` (Library files open in the same editor, §10.2), `revealRange` for search hits, and directory watching. |
 | `StickyDocument.swift` | One open file. `text` is a working copy; `savedText` mirrors disk. Debounced (600ms) atomic autosave. `Conflict(diskText:)` + `ConflictChoice = .keepMine/.keepDisk/.keepBoth` (§8.4, §8.5, §19.3, §19.4). |
-| `DailyFiles.swift` / `DailyDate.swift` | Filename ↔ date, long-form display strings. `isBlankSticky` — nothing but whitespace and, at most, that day's own heading; `mostRecentSticky` steps over blank days so carry-forward is not swallowed by a day spent only in Scratch. |
+| `DailyFiles.swift` / `DailyDate.swift` | Filename ↔ date, long-form display strings. `isBlankSticky` — nothing but whitespace and, at most, that day's own heading; `mostRecentSticky` steps over blank days so carry-forward is not swallowed by a day spent only in Scratch. `organize` silently moves flat/stray stickies into `daily/YYYY/MM/` (never overwrites; skips the open file) — run at `DailySession` init and after every sync that brings changes in; readers find stickies anywhere under `daily/`. |
 | `NewDayComposer.swift` | `NewDayStart` = `.scratch / .carryForwardHeaders / .defaultHeaders`; builds the opening text (§7.2–7.6). |
 | `NewDayPrompt.swift` | The tiny "ask each day" prompt (§7.3). |
 | `MarkdownHeadings.swift` | Heading parse used by carry-forward. |
