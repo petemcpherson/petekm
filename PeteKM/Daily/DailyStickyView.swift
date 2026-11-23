@@ -17,8 +17,7 @@ struct DailyStickyView: View {
     @State private var palette = PaletteModel()
     @State private var keyMonitor: Any?
     /// Transient one-line result of an external-tool action (DESIGN §32).
-    @State private var notice: String?
-    @State private var noticeTask: Task<Void, Never>?
+    @State private var notices = NoticeBoard()
 
     var body: some View {
         Group {
@@ -90,7 +89,7 @@ struct DailyStickyView: View {
         }
         .onDisappear {
             removePaletteShortcut()
-            noticeTask?.cancel()
+            notices.clear()
         }
         .onReceive(NotificationCenter.default.publisher(for: .peteKMSyncNow)) { _ in
             gitSync(session: session)
@@ -315,25 +314,17 @@ struct DailyStickyView: View {
                 FolderInitializer.agentFilesAreOutOfDate(folder)
             }.value
             guard outOfDate else { return }
-            // Recorded only once the notice stays up its full time: a launch sync
-            // notice can replace it within a second, and then it must come back.
-            show("Agent files are out of date. Settings → Folder → Refresh Agent Files.",
-                 seconds: 15) {
+            // Recorded only once the notice stays up its full time. A launch sync
+            // notice can replace it within a second; it then comes back after that one.
+            notices.show("Agent files are out of date. Settings → Folder → Refresh Agent Files.",
+                         seconds: 15, mustBeSeen: true) {
                 settings.agentFilesNoticeShownFor = fingerprint
             }
         }
     }
 
-    /// `onShownFully` runs only if no other notice replaced this one before it timed out.
-    private func show(_ text: String, seconds: Double = 6, onShownFully: (() -> Void)? = nil) {
-        noticeTask?.cancel()
-        notice = text
-        noticeTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(seconds))
-            guard !Task.isCancelled else { return }
-            notice = nil
-            onShownFully?()
-        }
+    private func show(_ text: String, seconds: Double = 6) {
+        notices.show(text, seconds: seconds)
     }
 
     /// Header text and icons follow the custom text color when one is set, so they match the
@@ -387,7 +378,7 @@ struct DailyStickyView: View {
                     .foregroundStyle(DS.Color.error)
                     .lineLimit(1)
                     .help(error)
-            } else if let notice {
+            } else if let notice = notices.text {
                 // External tools report here and then get out of the way.
                 Text(notice)
                     .font(DS.Text.caption)
