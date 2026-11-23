@@ -221,6 +221,7 @@ Add a row every release. The build number must always increase.
 | 1.0.1 | 2 | 2026-10-08 | Sync fix for a new Daily Sticky on both Macs; legible text on custom backgrounds. |
 | 1.0.2 | 3 | 2026-10-26 | Process skips today's Daily Sticky by default; marker never set to today. |
 | 1.0.3 | 4 | 2026-10-26 | Agent-files notice re-shows if another notice replaced it. |
+| 1.1.0 | 5 | 2026-11-23 | Daily Stickies filed into `daily/YYYY/MM/`; existing ones moved automatically. |
 
 ---
 
