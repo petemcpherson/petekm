@@ -1,6 +1,6 @@
 cask "petekm" do
-  version "1.1.1"
-  sha256 "05eec6d60c085c88e5ed1d817257d8ee80132993c55179f1ff376ac51d4de074"
+  version "1.1.2"
+  sha256 "30a53b1bf37c1d901b73b85e36bd8dd91bb17bace0868cc65151793f135b06db"
 
   url "https://github.com/petemcpherson/petekm/releases/download/v#{version}/PeteKM-#{version}.dmg"
   name "PeteKM"

@@ -223,6 +223,7 @@ Add a row every release. The build number must always increase.
 | 1.0.3 | 4 | 2026-10-26 | Agent-files notice re-shows if another notice replaced it. |
 | 1.1.0 | 5 | 2026-11-23 | Daily Stickies filed into `daily/YYYY/MM/`; existing ones moved automatically. |
 | 1.1.1 | 6 | 2026-11-23 | Agent-files notice waits out the launch sync notice instead of losing to it. |
+| 1.1.2 | 7 | 2026-11-27 | Push retried once when another device pushed between fetch and push (iOS Phase 0). |
 
 ---
 
