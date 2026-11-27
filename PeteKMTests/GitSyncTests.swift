@@ -719,3 +719,164 @@ final class WriteBeforeRebaseRunner: GitRunner, @unchecked Sendable {
     #expect(!FolderInitializer.ensureLocalDailyUnionMerge(plain))
     #expect(!FileWriting.isDirectory(plain.gitDirectory))
 }
+
+// MARK: - Push-race retry (iOS spec §13.2)
+
+/// Real git that records every invocation and runs one side effect just before
+/// the first push: another device pushing between this Mac's fetch and push.
+final class RaceBeforePushRunner: GitRunner, @unchecked Sendable {
+    private let lock = NSLock()
+    private var fired = false
+    private var _calls: [[String]] = []
+    let base = ProcessGitRunner()
+    let action: () -> Void
+
+    init(_ action: @escaping () -> Void) {
+        self.action = action
+    }
+
+    var calls: [[String]] {
+        lock.lock()
+        defer { lock.unlock() }
+        return _calls
+    }
+
+    var pushes: Int { calls.filter { $0.first == "push" }.count }
+
+    func run(_ arguments: [String], in directory: URL, timeout: Duration) -> GitResult {
+        lock.lock()
+        _calls.append(arguments)
+        let first = arguments.first == "push" && !fired
+        if first { fired = true }
+        lock.unlock()
+        if first { action() }
+        return base.run(arguments, in: directory, timeout: timeout)
+    }
+}
+
+/// Commits `text` at `path` in `folder` and pushes, outside PeteKM's sequence.
+private func pushDirectly(_ text: String, _ path: String, in folder: PeteKMFolder) {
+    try? GitFixture.write(text, path, in: folder)
+    GitSupport.run(["add", "-A"], in: folder.root)
+    GitSupport.run(["commit", "-m", "other device", "--trailer", "PeteKM-Device: Other Device"], in: folder.root)
+    GitSupport.run(["push"], in: folder.root)
+}
+
+@Test func pushThatLostARaceIsRetriedOnce() async throws {
+    guard let fixture = try GitFixture() else { return }
+    try fixture.write("# From A\n", "library/a.md", in: fixture.a)
+
+    let b = fixture.b
+    let runner = RaceBeforePushRunner { pushDirectly("# From B\n", "library/b.md", in: b) }
+    let run = await GitSupport.run(fixture.a, context: GitSupport.SyncContext(runner: runner, device: "Mac A"))
+
+    #expect(run.outcome == .synced)
+    #expect(run.pushSucceeded)
+    #expect(run.didBringIn)
+    #expect(run.incomingDevice == "Other Device")
+    #expect(runner.pushes == 2)
+    #expect(!runner.calls.contains { $0.contains("--force") || $0.contains("-f") || $0.contains("--force-with-lease") })
+    // Both commits on top of the seed, linear.
+    #expect(fixture.originCommitCount == 3)
+    #expect(fixture.git(["rev-list", "--merges", "--count", "HEAD"], in: fixture.a) == "0")
+    #expect(fixture.git(["status", "--porcelain"], in: fixture.a) == "")
+    #expect(try fixture.read("library/b.md", in: fixture.a) == Data("# From B\n".utf8))
+    #expect(fixture.head(fixture.a) == GitSupport.run(["rev-parse", "main"], in: fixture.origin))
+    #expect(!fixture.exists(GitSupport.rebaseMarkerName, in: fixture.a))
+}
+
+@Test func pushRaceOnTheSameDayMergesByUnion() async throws {
+    guard let fixture = try GitFixture() else { return }
+    await fixture.shareDailyUnionMerge()
+    let path = "daily/2026/11/2026-11-26.md"
+    try fixture.write("# November 26, 2026\n\n- start\n", path, in: fixture.a)
+    #expect(await fixture.run(fixture.a).outcome == .synced)
+    #expect(await fixture.run(fixture.b).outcome == .synced)
+
+    try fixture.write("# November 26, 2026\n\n- start\n- from A\n", path, in: fixture.a)
+    let b = fixture.b
+    let runner = RaceBeforePushRunner {
+        pushDirectly("# November 26, 2026\n\n- start\n- from phone\n", path, in: b)
+    }
+    let run = await GitSupport.run(fixture.a, context: GitSupport.SyncContext(runner: runner, device: "Mac A"))
+
+    #expect(run.outcome == .synced)
+    #expect(run.mergedDailyPaths == [path])
+    #expect(runner.pushes == 2)
+    #expect(!runner.calls.contains { $0.contains("--force") || $0.contains("-f") })
+    let merged = try fixture.read(path, in: fixture.a)
+    #expect(lines(merged).isSuperset(of: ["# November 26, 2026", "- start", "- from A", "- from phone"]))
+    #expect(!String(decoding: merged, as: UTF8.self).contains("<<<<<<<"))
+    #expect(fixture.git(["status", "--porcelain"], in: fixture.a) == "")
+    #expect(!fixture.exists("rebase-merge", in: fixture.a))
+    #expect(!fixture.exists(GitSupport.rebaseMarkerName, in: fixture.a))
+
+    #expect(await fixture.run(fixture.b).outcome == .synced)
+    #expect(try fixture.read(path, in: fixture.b) == merged)
+}
+
+@Test func unwritableRemoteIsPushFailedWithoutRetry() async throws {
+    guard let fixture = try GitFixture() else { return }
+    let nowhere = fixture.base.appending(path: "missing.git").path(percentEncoded: false)
+    fixture.git(["remote", "set-url", "--push", "origin", nowhere], in: fixture.a)
+    try fixture.write("# Note\n", "library/note.md", in: fixture.a)
+
+    let runner = RaceBeforePushRunner {}
+    let run = await GitSupport.run(fixture.a, context: GitSupport.SyncContext(runner: runner, device: "Mac A"))
+
+    #expect(run.outcome == .pushFailed)
+    #expect(run.didCommit)
+    #expect(runner.pushes == 1)
+    #expect(runner.calls.filter { $0.first == "fetch" }.count == 1)
+}
+
+private let rejectedPush = GitResult(
+    status: 1, stdout: "",
+    stderr: "To github.com:pete/notes.git\n ! [rejected]        main -> main (fetch first)\nerror: failed to push some refs\n",
+    timedOut: false)
+
+/// Ahead by one, never behind, every push rejected as non-fast-forward.
+private func rejectingRunner(beforePush: @escaping () -> Void = {}) -> FakeGitRunner {
+    FakeGitRunner { arguments in
+        switch arguments.first {
+        case "remote": return okWith("origin\n")
+        case "status": return okWith(" M library/note.md\n")
+        case "rev-list": return okWith("1\t0\n")
+        case "push":
+            beforePush()
+            return rejectedPush
+        default: return ok
+        }
+    }
+}
+
+@Test func secondRejectedPushIsPushFailed() async throws {
+    let folder = try fakeRepository()
+    let runner = rejectingRunner()
+    let run = await GitSupport.run(folder, context: GitSupport.SyncContext(runner: runner))
+
+    #expect(run.outcome == .pushFailed)
+    #expect(runner.calls.filter { $0.first == "push" }.count == 2)
+    #expect(runner.calls.filter { $0.first == "fetch" }.count == 2)
+}
+
+/// The retry respects the sleep/quit deadline: once it passes, no second
+/// network step is started.
+@Test func pushRaceRetryStopsAtTheDeadline() async throws {
+    let folder = try fakeRepository()
+    let runner = rejectingRunner { Thread.sleep(forTimeInterval: 0.6) }
+    let context = GitSupport.SyncContext(deadline: Date().addingTimeInterval(0.4), runner: runner)
+    let run = await GitSupport.run(folder, context: context)
+
+    #expect(run.outcome == .pushFailed)
+    #expect(runner.calls.filter { $0.first == "push" }.count == 1)
+    #expect(runner.calls.filter { $0.first == "fetch" }.count == 1)
+}
+
+@Test func nonFastForwardRejectionMatchesOnlyRejectedPushes() {
+    #expect(GitSupport.isNonFastForwardRejection(" ! [rejected]        main -> main (fetch first)"))
+    #expect(GitSupport.isNonFastForwardRejection(" ! [rejected]        main -> main (non-fast-forward)"))
+    #expect(!GitSupport.isNonFastForwardRejection("remote: Permission to pete/notes.git denied.\nfatal: unable to access"))
+    #expect(!GitSupport.isNonFastForwardRejection(" ! [remote rejected] main -> main (pre-receive hook declined)"))
+    #expect(!GitSupport.isNonFastForwardRejection("fatal: Could not read from remote repository."))
+}

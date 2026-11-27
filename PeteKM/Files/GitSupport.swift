@@ -377,6 +377,13 @@ nonisolated enum GitSupport {
         }
     }
 
+    /// A push the remote refused because it moved since our fetch: git prints
+    /// `! [rejected] … (fetch first)` or `(non-fast-forward)` (iOS spec §13.2).
+    /// Auth, network, and permission failures never match.
+    static func isNonFastForwardRejection(_ stderr: String) -> Bool {
+        stderr.contains("[rejected]") && (stderr.contains("(fetch first)") || stderr.contains("(non-fast-forward)"))
+    }
+
     // MARK: - The run (sync v2 §6.1)
 
     /// What the caller supplies. Flush and reconcile are the only steps that hop
@@ -501,25 +508,18 @@ nonisolated enum GitSupport {
         }
         result.fetchSucceeded = true
 
-        // 5. Divergence. Nil means no upstream yet.
-        var counts = aheadBehind(folder, runner: git)
-
-        // 6. Bring changes in, locally and fast.
-        if let divergence = counts, divergence.behind > 0 {
-            guard context.allowRebase else {
-                // Paused (§6.6): a push would be rejected anyway.
-                recordCounts()
-                return finish(.pullConflict)
-            }
-
+        /// Step 6, shared with the push-race retry so there is one rebase path:
+        /// catch late typing, guard again, rebase under our marker with the union
+        /// attribute, then show the new disk state. Nil when it brought changes in.
+        func bringChangesIn() async -> SyncOutcome? {
             // a. Catch typing that happened during the fetch.
             await context.flush()
-            guard let again = commitIfDirty() else { return finish(.pushFailed) }
+            guard let again = commitIfDirty() else { return .pushFailed }
             result.didCommit = result.didCommit || again
 
             // b. Guard again, learn what's coming, then rebase under our marker.
             if let blocked = guardOutcome(folder, now: context.now, abortOwnRebase: abortOwnRebase) {
-                return finish(blocked)
+                return blocked
             }
             var merged = dailyPathsChangedOnBothSides(folder, runner: git)
             let incoming = incomingDeviceName(folder, runner: git)
@@ -547,31 +547,72 @@ nonisolated enum GitSupport {
                     try? FileManager.default.removeItem(at: marker)
                 }
                 recordCounts()
-                return finish(.pullConflict)
+                return .pullConflict
             }
             try? FileManager.default.removeItem(at: marker)
             result.didBringIn = true
-            result.mergedDailyPaths = merged
+            result.mergedDailyPaths = Array(Set(result.mergedDailyPaths + merged)).sorted()
             result.incomingDevice = incoming
 
             // c. Show the new disk state at once.
             await context.reconcile()
+            return nil
+        }
+
+        /// Step 7's command, or nil when there is nothing to send.
+        func pushArguments(_ counts: (ahead: Int, behind: Int)?) -> [String]? {
+            if let counts {
+                return counts.ahead > 0 ? ["push"] : nil
+            }
+            // No upstream yet on a fresh branch — set it once, as v1 did.
+            let branch = git.invoke(["rev-parse", "--abbrev-ref", "HEAD"], in: folder.root)
+            guard branch.succeeded, !branch.output.isEmpty, branch.output != "HEAD" else { return nil }
+            return ["push", "--set-upstream", remote, branch.output]
+        }
+
+        // 5. Divergence. Nil means no upstream yet.
+        var counts = aheadBehind(folder, runner: git)
+
+        // 6. Bring changes in, locally and fast.
+        if let divergence = counts, divergence.behind > 0 {
+            guard context.allowRebase else {
+                // Paused (§6.6): a push would be rejected anyway.
+                recordCounts()
+                return finish(.pullConflict)
+            }
+            if let stopped = await bringChangesIn() { return finish(stopped) }
             counts = aheadBehind(folder, runner: git)
         }
 
         // 7. Send changes out, only when there is something to send.
-        var push: [String]?
-        if let divergence = counts {
-            if divergence.ahead > 0 { push = ["push"] }
-        } else {
-            // No upstream yet on a fresh branch — set it once, as v1 did.
-            let branch = git.invoke(["rev-parse", "--abbrev-ref", "HEAD"], in: folder.root)
-            if branch.succeeded, !branch.output.isEmpty, branch.output != "HEAD" {
-                push = ["push", "--set-upstream", remote, branch.output]
+        if let push = pushArguments(counts) {
+            var pushed = git.invoke(push, in: folder.root, timeout: Timeouts.network)
+            // Another device pushed between our fetch and our push (iOS spec
+            // §13.2). Fetch, rebase, and push once more. Any other failure, a
+            // paused run, or a passed sleep/quit deadline keeps today's outcome.
+            if !pushed.succeeded, isNonFastForwardRejection(pushed.stderr), context.allowRebase,
+               context.deadline.map({ $0 > Date() }) ?? true {
+                if let blocked = guardOutcome(folder, now: context.now, abortOwnRebase: abortOwnRebase) {
+                    return finish(blocked)
+                }
+                guard git.invoke(["fetch"], in: folder.root, timeout: Timeouts.network).succeeded else {
+                    recordCounts()
+                    return finish(.pushFailed)
+                }
+                counts = aheadBehind(folder, runner: git)
+                if let divergence = counts, divergence.behind > 0 {
+                    if let stopped = await bringChangesIn() { return finish(stopped) }
+                    counts = aheadBehind(folder, runner: git)
+                }
+                guard let retry = pushArguments(counts) else {
+                    // The rebase left nothing to send: upstream already had it.
+                    recordCounts()
+                    let changed = result.didCommit || result.didBringIn
+                    return finish(changed ? .synced : .nothingToSync)
+                }
+                pushed = git.invoke(retry, in: folder.root, timeout: Timeouts.network)
             }
-        }
-        if let push {
-            guard git.invoke(push, in: folder.root, timeout: Timeouts.network).succeeded else {
+            guard pushed.succeeded else {
                 recordCounts()
                 return finish(.pushFailed)
             }
